@@ -157,34 +157,126 @@ GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
 | `POST` | `/api/subscription/verify` | Verify Google Play subscription | ✅ |
 | `GET` | `/api/subscription/status` | Get subscription status | ✅ |
 
-## Example Requests
+## 📚 API Reference & Examples
 
-### Generate Image
+### 🔐 Authentication
 
+#### Register a New User
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+#### Login
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+### 👤 User Profile
+
+#### Get User Profile
+```http
+GET /api/user/profile
+Authorization: Bearer <your_jwt_token>
+```
+
+#### Update User Profile
+```http
+PUT /api/user/profile
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "email": "new.email@example.com",
+  "name": "John Doe"
+}
+```
+
+### 💰 Coin Management
+
+#### Buy Coins
+```http
+POST /api/coin/buy
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "amount": 100,
+  "paymentMethod": "stripe",
+  "transactionId": "txn_1234567890"
+}
+```
+
+#### Earn Coins
+```http
+POST /api/coin/earn
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "amount": 10,
+  "source": "ad_watch"
+}
+```
+
+### 🖼️ Image Generation
+
+#### Generate AI Image
 ```http
 POST /api/image/generate
 Authorization: Bearer <your_jwt_token>
 Content-Type: application/json
 
 {
-  "prompt": "a beautiful sunset over mountains",
+  "prompt": "a beautiful sunset over mountains, digital art",
   "stylePreset": "digital-art",
   "width": 1024,
   "height": 1024,
   "samples": 1,
-  "steps": 30,
+  "steps": 50,
   "cfgScale": 7
 }
 ```
 
-### Get Image History
-
+#### Get Image History
 ```http
 GET /api/image/history?page=1&limit=10
 Authorization: Bearer <your_jwt_token>
 ```
 
-## Deployment
+### 🧾 Subscription
+
+#### Verify Google Play Subscription
+```http
+POST /api/subscription/verify
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "purchaseToken": "purchase_token_from_google_play",
+  "productId": "com.yourapp.monthly_premium",
+  "packageName": "com.yourapp"
+}
+```
+
+#### Get Subscription Status
+```http
+GET /api/subscription/status
+Authorization: Bearer <your_jwt_token>
+```
+
+## 🚀 Deployment
 
 ### Vercel
 

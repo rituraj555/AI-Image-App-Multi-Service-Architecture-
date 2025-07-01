@@ -1,5 +1,4 @@
-const { google } = require('googleapis');
-const androidpublisher = google.androidpublisher('v3');
+const { androidpublisher } = require('@googleapis/androidpublisher');
 
 // Initialize the Google Play Developer API client
 const initAndroidPublisher = () => {
