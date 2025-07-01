@@ -1,6 +1,15 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
 
+// Validate required environment variables
+const requiredEnvVars = ['JWT_SECRET', 'JWT_EXPIRE', 'NODE_ENV'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Missing required environment variable: ${envVar}`);
+    process.exit(1);
+  }
+}
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public

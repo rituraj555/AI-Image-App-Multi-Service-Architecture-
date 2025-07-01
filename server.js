@@ -7,6 +7,9 @@ const path = require('path');
 // Load environment variables
 dotenv.config();
 
+// Create Express app
+const app = express();
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const coinRoutes = require('./routes/coinRoutes');
@@ -17,8 +20,7 @@ const userRoutes = require('./routes/userRoutes');
 // Import error handler
 const { errorHandler } = require('./utils/errorResponse');
 
-// Initialize express
-const app = express();
+// Middleware
 
 // Middleware
 app.use(cors());
@@ -62,7 +64,7 @@ app.use((req, res) => {
 });
 
 // Connect to MongoDB and start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8000;
 
 const startServer = async () => {
   try {
@@ -72,8 +74,13 @@ const startServer = async () => {
     });
     console.log('MongoDB connected');
 
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+      
+      // Log environment variables (except sensitive ones)
+      console.log('Environment:', process.env.NODE_ENV || 'development');
+      console.log('MongoDB:', process.env.MONGO_URI ? 'Connected' : 'Not configured');
+      console.log('JWT Secret:', process.env.JWT_SECRET ? 'Set' : 'Not set');
     });
   } catch (error) {
     console.error('Error connecting to MongoDB:', error.message);

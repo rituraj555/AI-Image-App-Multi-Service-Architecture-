@@ -2,6 +2,15 @@ const { ErrorResponse } = require('../utils/errorResponse');
 const User = require('../models/User');
 const { verifySubscription, isSubscriptionActive } = require('../utils/googlePlayClient');
 
+// Validate required environment variables
+const requiredEnvVars = ['GOOGLE_PLAY_PACKAGE_NAME'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Missing required environment variable: ${envVar}`);
+    process.exit(1);
+  }
+}
+
 // @desc    Verify Google Play subscription
 // @route   POST /api/subscription/verify
 // @access  Private
@@ -31,11 +40,17 @@ exports.verifySubscription = async (req, res, next) => {
       : null;
 
     // Determine subscription plan based on productId
-    let subscriptionPlan = 'monthly';
-    if (productId.includes('yearly')) {
-      subscriptionPlan = 'yearly';
-    } else if (productId.includes('lifetime')) {
-      subscriptionPlan = 'lifetime';
+    const subscriptionPlans = {
+      monthly: process.env.SUBSCRIPTION_PLAN_MONTHLY || 'monthly',
+      yearly: process.env.SUBSCRIPTION_PLAN_YEARLY || 'yearly',
+      lifetime: process.env.SUBSCRIPTION_PLAN_LIFETIME || 'lifetime'
+    };
+
+    let subscriptionPlan = subscriptionPlans.monthly;
+    if (productId.includes(subscriptionPlans.yearly)) {
+      subscriptionPlan = subscriptionPlans.yearly;
+    } else if (productId.includes(subscriptionPlans.lifetime)) {
+      subscriptionPlan = subscriptionPlans.lifetime;
     }
 
     // Update user's subscription status
