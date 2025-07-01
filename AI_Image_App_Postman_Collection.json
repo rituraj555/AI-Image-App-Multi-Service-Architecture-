@@ -1,0 +1,328 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-1234-56789abcdef0",
+    "name": "AI Image App API",
+    "description": "Complete API collection for AI Image Generation App",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "🔐 Auth Service",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"testuser@example.com\",\n    \"password\": \"Test@1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new user account"
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"testuser@example.com\",\n    \"password\": \"Test@1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login user and get JWT token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 User Service",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/user/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "profile"]
+            },
+            "description": "Get current user's profile information"
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Coin Service",
+      "item": [
+        {
+          "name": "Buy Coins",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount\": 100,\n    \"paymentMethod\": \"stripe\",\n    \"transactionId\": \"txn_1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/coin/buy",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "coin", "buy"]
+            },
+            "description": "Purchase coins using a payment method"
+          }
+        },
+        {
+          "name": "Earn Coins",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount\": 10,\n    \"source\": \"ad_watch\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/coin/earn",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "coin", "earn"]
+            },
+            "description": "Earn coins through activities like watching ads"
+          }
+        },
+        {
+          "name": "Deduct Coins",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"amount\": 5,\n    \"purpose\": \"image_generation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/coin/deduct",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "coin", "deduct"]
+            },
+            "description": "Deduct coins for services like image generation"
+          }
+        },
+        {
+          "name": "Get Coin Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/coin/balance",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "coin", "balance"]
+            },
+            "description": "Get current user's coin balance"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🖼️ Image Service",
+      "item": [
+        {
+          "name": "Generate Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"prompt\": \"A beautiful sunset over mountains, digital art\",\n    \"stylePreset\": \"digital-art\",\n    \"width\": 1024,\n    \"height\": 1024,\n    \"samples\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/image/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "image", "generate"]
+            },
+            "description": "Generate an AI image using a text prompt"
+          }
+        },
+        {
+          "name": "Get Image History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/image/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "image", "history"]
+            },
+            "description": "Get history of generated images for the current user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧾 Subscription Service",
+      "item": [
+        {
+          "name": "Verify Google Play Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"purchaseToken\": \"purchase_token_from_google_play\",\n    \"productId\": \"com.yourapp.monthly_premium\",\n    \"packageName\": \"com.yourapp\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subscription/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscription", "verify"]
+            },
+            "description": "Verify a Google Play subscription"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set environment variables based on the selected environment",
+          "if (pm.environment.get('baseUrl') === undefined) {",
+          "    pm.environment.set('baseUrl', 'http://localhost:5000'); // Default to local",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Save auth token from login response",
+          "if (pm.response.code === 200 && pm.request.url.path.includes('login')) {",
+          "    var jsonData = pm.response.json();",
+          "    if (jsonData.token) {",
+          "        pm.environment.set('authToken', jsonData.token);",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Base URL for the API"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT token for authenticated requests"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  }
+}

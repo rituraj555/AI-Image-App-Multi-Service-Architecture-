@@ -1,0 +1,139 @@
+@baseUrl = http://localhost:5000
+@contentType = application/json
+
+### 1. 🔐 AUTH SERVICE
+
+# Register a new user
+# POST /api/auth/register
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "testuser@example.com",
+  "password": "Test@1234"
+}
+
+###
+
+# Login user
+# POST /api/auth/login
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "testuser@example.com",
+  "password": "Test@1234"
+}
+
+###
+
+# Extract token from login response and set as variable
+@authToken = {{login.response.body.token}}
+
+### 2. 👤 USER SERVICE
+
+# Get user profile
+# GET /api/user/profile
+GET {{baseUrl}}/api/user/profile
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+### 3. 💰 COIN SERVICE
+
+# Buy coins
+# POST /api/coin/buy
+POST {{baseUrl}}/api/coin/buy
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "amount": 100,
+  "paymentMethod": "stripe",
+  "transactionId": "txn_1234567890"
+}
+
+###
+
+# Earn coins (e.g., from watching ads)
+# POST /api/coin/earn
+POST {{baseUrl}}/api/coin/earn
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "amount": 10,
+  "source": "ad_watch"
+}
+
+###
+
+# Deduct coins
+# POST /api/coin/deduct
+POST {{baseUrl}}/api/coin/deduct
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "amount": 5,
+  "purpose": "image_generation"
+}
+
+###
+
+# Get coin balance
+# GET /api/coin/balance
+GET {{baseUrl}}/api/coin/balance
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+### 4. 🖼️ IMAGE GENERATION SERVICE
+
+# Generate AI image
+# POST /api/image/generate
+POST {{baseUrl}}/api/image/generate
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "prompt": "A beautiful sunset over mountains, digital art",
+  "stylePreset": "digital-art",
+  "width": 1024,
+  "height": 1024,
+  "samples": 1
+}
+
+###
+
+# Get image generation history
+# GET /api/image/history
+GET {{baseUrl}}/api/image/history
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+### 5. 🧾 SUBSCRIPTION SERVICE
+
+# Verify Google Play subscription
+# POST /api/subscription/verify
+POST {{baseUrl}}/api/subscription/verify
+Authorization: Bearer {{authToken}}
+Content-Type: {{contentType}}
+
+{
+  "purchaseToken": "purchase_token_from_google_play",
+  "productId": "com.yourapp.monthly_premium",
+  "packageName": "com.yourapp"
+}
+
+### 6. 🔄 TEST ENVIRONMENT SETUP
+
+# Set base URL for production environment
+# @name production
+@baseUrl = https://your-production-api.vercel.app
+
+# Set base URL for staging environment
+# @name staging
+@baseUrl = https://your-staging-api.vercel.app
+
+# Set base URL for local development
+# @name local
+@baseUrl = http://localhost:5000
