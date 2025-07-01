@@ -25,8 +25,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from the public directory
+// Create uploads directory if it doesn't exist
+const fs = require('fs');
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Explicitly serve uploads from /uploads URL path
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // Route middleware
 app.use('/api/auth', authRoutes);

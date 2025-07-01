@@ -73,17 +73,20 @@ exports.generateImage = async (req, res, next) => {
     user.coins -= COST_PER_IMAGE;
     await user.save({ session });
 
-    // Save the generated image information
+    // Process the generated images
     const imageArtifacts = [];
     
     for (const artifact of response.data.artifacts) {
       const imageId = uuidv4();
+      
+      // Save image to storage (optional, if you still want to store it)
       const imageUrl = await saveImageToStorage(artifact.base64, imageId);
       
+      // Create image record in database
       const newImage = new Image({
         userId,
         prompt,
-        imageUrl,
+        imageUrl,  // Still store the URL if you want to keep track of it
         imageId,
         coinsUsed: COST_PER_IMAGE,
         size: {
@@ -100,9 +103,12 @@ exports.generateImage = async (req, res, next) => {
       });
 
       await newImage.save({ session });
+      
+      // Include base64 data in the response
       imageArtifacts.push({
         id: newImage._id,
-        imageUrl: newImage.imageUrl,
+        imageData: `data:image/png;base64,${artifact.base64}`, // Base64 data URL
+        imageUrl: imageUrl, // Still include URL if needed
         prompt: newImage.prompt,
         createdAt: newImage.createdAt
       });

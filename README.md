@@ -118,7 +118,115 @@ STABILITY_API_KEY=your_stability_ai_api_key
 
 # Google Play (for subscriptions)
 GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
+
+# AWS S3 Configuration (for image storage)
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=your_aws_region
+AWS_S3_BUCKET_NAME=your-s3-bucket-name
+AWS_S3_BUCKET_URL=https://your-s3-bucket-name.s3.your-region.amazonaws.com
 ```
+
+## ☁️ AWS S3 Configuration
+
+### 1. Prerequisites
+- AWS Account with S3 access
+- IAM User with S3 permissions
+- S3 Bucket created
+
+### 2. IAM User Setup
+1. Go to AWS IAM Console
+2. Create a new user with programmatic access
+3. Attach the `AmazonS3FullAccess` policy (or create a custom policy with least privilege)
+4. Save the Access Key ID and Secret Access Key
+
+### 3. S3 Bucket Setup
+1. Go to AWS S3 Console
+2. Create a new bucket
+3. Enable CORS configuration:
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["PUT", "POST", "GET", "DELETE"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": []
+  }
+]
+```
+4. Update bucket policy to allow public access if needed
+
+### 4. Install Required Packages
+```bash
+npm install aws-sdk @aws-sdk/client-s3
+```
+
+### 5. S3 Upload Helper
+Create `utils/s3Upload.js`:
+
+```javascript
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+const uploadToS3 = async (fileBuffer, fileName, mimetype) => {
+  const uploadParams = {
+    Bucket: process.env.AWS_S3_BUCKET_NAME,
+    Body: fileBuffer,
+    Key: fileName,
+    ContentType: mimetype,
+    ACL: 'public-read', // Remove this if you don't want public access
+  };
+
+  try {
+    const command = new PutObjectCommand(uploadParams);
+    await s3Client.send(command);
+    
+    // Return public URL
+    return `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+  } catch (error) {
+    console.error('Error uploading to S3:', error);
+    throw error;
+  }
+};
+
+module.exports = { uploadToS3 };
+```
+
+### 6. Update Image Controller
+Modify your image controller to use S3:
+
+```javascript
+const { uploadToS3 } = require('../utils/s3Upload');
+
+// In your image generation/upload function
+const fileBuffer = Buffer.from(base64Data, 'base64');
+const fileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}.png`;
+
+const imageUrl = await uploadToS3(
+  fileBuffer,
+  fileName,
+  'image/png'
+);
+```
+
+### 7. Testing the Setup
+1. Set all AWS environment variables in your `.env` file
+2. Restart your server
+3. Test image upload functionality
+
+### 8. Troubleshooting
+- **Access Denied**: Check IAM permissions and bucket policy
+- **CORS Issues**: Verify CORS configuration on the S3 bucket
+- **Slow Uploads**: Consider using AWS CloudFront for CDN
+- **Large Files**: Implement multipart upload for files > 5MB
 
 ## 🧩 Services & APIs
 
@@ -145,6 +253,87 @@ GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
 
 ### 🖼️ Image Generation Service
 | Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/api/image/generate` | Generate AI image (returns base64 data) | ✅ |
+| `GET` | `/api/image/history` | Get generation history | ✅ |
+| `GET` | `/api/image/:id` | Get specific image details | ✅ |
+| `DELETE` | `/api/image/:id` | Delete generated image | ✅ |
+
+## 📚 API Reference & Examples
+
+### Image Generation
+
+#### Request
+```http
+POST /api/image/generate
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "prompt": "a beautiful sunset over mountains, digital art",
+  "stylePreset": "digital-art",
+  "width": 1024,
+  "height": 1024,
+  "samples": 1,
+  "steps": 30,
+  "cfgScale": 7
+}
+```
+
+#### Response (Success)
+```json
+{
+  "success": true,
+  "data": {
+    "images": [
+      {
+        "id": "60a7b3c9e6b0f30015f8d9a1",
+        "imageData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA...",
+        "imageUrl": "/uploads/123e4567-e89b-12d3-a456-426614174000.png",
+        "prompt": "a beautiful sunset over mountains, digital art",
+        "createdAt": "2025-07-01T14:30:00.000Z"
+      }
+    ],
+    "coinsUsed": 10,
+    "remainingCoins": 990
+  }
+}
+```
+
+#### Frontend Usage Example
+```javascript
+// React component example
+function GeneratedImage({ imageData, prompt }) {
+  return (
+    <div className="generated-image">
+      <img 
+        src={imageData} 
+        alt={prompt}
+        style={{ maxWidth: '100%', height: 'auto' }}
+      />
+      <p>{prompt}</p>
+    </div>
+  );
+}
+
+// Plain HTML
+/*
+<div class="image-container">
+  <img 
+    src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA..." 
+    alt="AI generated image"
+  />
+</div>
+*/
+```
+
+### Important Notes
+- The `imageData` field contains the complete base64-encoded image data that can be directly used in an `<img>` tag
+- The `imageUrl` is also provided if you need to reference the image by URL
+- Base64 responses are larger than binary data, so consider this for mobile users
+- For large images, you might want to use the URL approach instead
+
+## 🧾 Subscription
 |--------|----------|-------------|---------------|
 | `POST` | `/api/image/generate` | Generate AI image | ✅ |
 | `GET` | `/api/image/history` | Get generation history | ✅ |
