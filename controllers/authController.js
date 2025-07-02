@@ -15,7 +15,7 @@ for (const envVar of requiredEnvVars) {
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { name, email, password } = req.body;
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
@@ -26,10 +26,12 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    // Create user
+    // Create user with 30 coins by default
     const user = await User.create({
+      name,
       email,
-      password
+      password,
+      coins: 30  // Give new users 30 coins by default
     });
 
     // Generate JWT token
@@ -40,6 +42,7 @@ exports.register = async (req, res, next) => {
       token,
       user: {
         id: user._id,
+        name: user.name,
         email: user.email,
         createdAt: user.createdAt
       }
@@ -84,6 +87,7 @@ exports.login = async (req, res, next) => {
       token,
       user: {
         id: user._id,
+        name: user.name,
         email: user.email,
         createdAt: user.createdAt
       }
@@ -104,6 +108,7 @@ exports.getMe = async (req, res, next) => {
       success: true,
       user: {
         id: user._id,
+        name: user.name,
         email: user.email,
         createdAt: user.createdAt
       }
