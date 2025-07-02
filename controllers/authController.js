@@ -26,11 +26,7 @@ exports.register = async (req, res, next) => {
       });
     }
 
-<<<<<<< HEAD
     // Create user with 30 coins by default
-=======
-       // Create user with 30 coins by default
->>>>>>> b762d02cfe39dc2e3eac0e9fd568cc4472011bad
     const user = await User.create({
       name,
       email,

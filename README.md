@@ -63,6 +63,99 @@ This application uses environment variables for configuration. Here's a breakdow
 
 For a complete list of all available environment variables, see the [.env.example](.env.example) file.
 
+## 🔐 Authentication API
+
+### Register New User
+
+**Endpoint:** `POST /api/auth/register`
+
+Register a new user account.
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "name": "John Doe",
+  "email": "user@example.com",
+  "password": "securepassword123"
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "success": true,
+  "token": "jwt_token_here",
+  "user": {
+    "id": "user_id_here",
+    "name": "John Doe",
+    "email": "user@example.com",
+    "createdAt": "2023-01-01T00:00:00.000Z"
+  }
+}
+```
+
+### Login User
+
+**Endpoint:** `POST /api/auth/login`
+
+Authenticate a user and get a JWT token.
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword123"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "token": "jwt_token_here",
+  "user": {
+    "id": "user_id_here",
+    "name": "John Doe",
+    "email": "user@example.com",
+    "createdAt": "2023-01-01T00:00:00.000Z"
+  }
+}
+```
+
+### Get Current User
+
+**Endpoint:** `GET /api/auth/me`
+
+Get the currently authenticated user's profile.
+
+**Headers:**
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "user": {
+    "id": "user_id_here",
+    "name": "John Doe",
+    "email": "user@example.com",
+    "createdAt": "2023-01-01T00:00:00.000Z"
+  }
+}
+```
+
 ## 🖼️ Image Generation API
 
 ### Generate Image
