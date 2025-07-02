@@ -26,10 +26,11 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    // Create user
+       // Create user with 30 coins by default
     const user = await User.create({
       email,
-      password
+      password,
+      coins: 30  // Give new users 30 coins by default
     });
 
     // Generate JWT token
