@@ -33,12 +33,12 @@ This guide provides a comprehensive walkthrough for setting up an Application Lo
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                 Application Load Balancer                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐ │
-│  │  Listener    │  │  Listener    │  │  Target Groups    │ │
-│  │  HTTP (80)   │  │  HTTPS (443) ├──►  - auth-service   │ │
+│  ┌──────────────┐  ┌──────────────┐   ┌───────────────────┐ │
+│  │  Listener    │  │  Listener    │   │  Target Groups    │ │
+│  │  HTTP (80)   │  │  HTTPS (443) ├──►  - auth-service    │ │
 │  └──────────────┘  └──────────────┘   |  - image-service  │ │
-│                                       |  - coin-service    │ │
-└───────────────────────────────────────|  - sub-service     │─┘
+│                                       |  - coin-service   │ │
+└───────────────────────────────────────|  - sub-service    │─┘
                                         └───────────────────┘
                                                  │
     ┌────────────────────────────────────────────┼─────────────────────────────┐

@@ -69,7 +69,7 @@ For a complete list of all available environment variables, see the [.env.exampl
 
 **Endpoint:** `POST /api/auth/register`
 
-Register a new user account.
+Register a new user account with name, email, and password. New users receive 30 coins by default.
 
 **Headers:**
 ```
@@ -85,6 +85,18 @@ Content-Type: application/json
 }
 ```
 
+**Field Requirements:**
+| Field | Type | Required | Validation |
+|-------|------|----------|------------|
+| name | string | ✅ | 1-50 characters, cannot be empty |
+| email | string | ✅ | Must be a valid email format |
+| password | string | ✅ | Minimum 6 characters |
+
+**Notes:**
+- The `name` field will be automatically trimmed of any leading/trailing spaces
+- Email addresses are case-insensitive and will be converted to lowercase
+- Passwords are automatically hashed before being stored
+
 **Success Response (201 Created):**
 ```json
 {
@@ -98,6 +110,29 @@ Content-Type: application/json
   }
 }
 ```
+
+**Error Responses:**
+- `400 Bad Request` - Missing required fields or validation failed
+  ```json
+  {
+    "success": false,
+    "message": "Please provide your name"
+  }
+  ```
+- `400 Bad Request` - Email already registered
+  ```json
+  {
+    "success": false,
+    "message": "User already exists with this email"
+  }
+  ```
+- `500 Internal Server Error` - Server error during registration
+  ```json
+  {
+    "success": false,
+    "message": "Server error"
+  }
+  ```
 
 ### Login User
 

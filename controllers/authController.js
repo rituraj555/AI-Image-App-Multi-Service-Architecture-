@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
+const { formatDocument } = require('../utils/formatResponse');
 
 // Validate required environment variables
 const requiredEnvVars = ['JWT_SECRET', 'JWT_EXPIRE', 'NODE_ENV'];
@@ -37,9 +38,11 @@ exports.register = async (req, res, next) => {
     // Generate JWT token
     const token = generateToken(user._id);
 
-    res.status(201).json({
+    // Format the response document
+    const response = formatDocument({
       success: true,
       token,
+      id: user._id,
       user: {
         id: user._id,
         name: user.name,
@@ -47,6 +50,8 @@ exports.register = async (req, res, next) => {
         createdAt: user.createdAt
       }
     });
+    
+    res.status(201).json(response);
   } catch (error) {
     next(error);
   }
@@ -82,9 +87,11 @@ exports.login = async (req, res, next) => {
     // Generate JWT token
     const token = generateToken(user._id);
 
-    res.status(200).json({
+    // Format the response document
+    const response = formatDocument({
       success: true,
       token,
+      id: user._id,
       user: {
         id: user._id,
         name: user.name,
@@ -92,6 +99,8 @@ exports.login = async (req, res, next) => {
         createdAt: user.createdAt
       }
     });
+    
+    res.status(200).json(response);
   } catch (error) {
     next(error);
   }
