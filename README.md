@@ -13,13 +13,19 @@
 
 A robust, scalable backend system for an AI-powered image generation application. This project follows a microservices architecture with separate services for authentication, user management, coin transactions, AI image generation, and subscription handling.
 
-## 🚀 Recent Updates
+## 🚀 Recent Updates (v2.0.0)
+
+### Major Updates
+- **Switched to Stable Diffusion v1.5** for more cost-effective image generation
+- **User-Provided API Keys**: Users can now use their own Stability AI API keys
+- **Optimized for Mobile**: Reduced data usage with smaller image sizes by default
 
 ### Image Generation Improvements
-- **Fixed**: Empty negative prompts are now properly handled
-- **Enhanced**: Better error messages for API failures
-- **Improved**: Request validation and sanitization
-- **Optimized**: Default values from environment variables for better configuration
+- **Cost-Effective**: Optimized defaults for faster and cheaper generation
+- **Enhanced Validation**: Better input validation for dimensions and parameters
+- **Improved Error Handling**: More descriptive error messages
+- **Efficient Storage**: Optimized image storage and retrieval
+- **API Key Validation**: Basic validation for user-provided API keys
 
 ### ✨ Key Features
 - 🔐 **Secure Authentication** with JWT
@@ -46,20 +52,22 @@ This application uses environment variables for configuration. Here's a breakdow
 | `MONGO_URI` | MongoDB connection string | `mongodb+srv://...` |
 | `JWT_SECRET` | Secret for JWT token signing | `your_secure_secret` |
 | `JWT_EXPIRE` | JWT token expiration | `30d` |
-| `STABILITY_API_KEY` | Stability AI API key | `sk-...` |
+| `STABILITY_API_URL` | Base URL for Stability AI | `https://api.stability.ai` |
+| `COST_PER_IMAGE` | Coins deducted per image | `5` |
 | `GOOGLE_PLAY_PACKAGE_NAME` | Google Play package name | `com.yourapp.package` |
 
 ### Optional Variables
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEFAULT_IMAGE_WIDTH` | `1024` | Default width for generated images |
-| `DEFAULT_IMAGE_HEIGHT` | `1024` | Default height for generated images |
-| `DEFAULT_CFG_SCALE` | `7` | Default CFG scale for image generation |
-| `DEFAULT_STEPS` | `50` | Default number of generation steps |
-| `DEFAULT_SAMPLES` | `1` | Default number of images to generate |
-| `DEFAULT_STYLE_PRESET` | `enhance` | Default style preset |
+| `DEFAULT_IMAGE_WIDTH` | `512` | Default width for generated images (SD 1.5 supports 512 or 768) |
+| `DEFAULT_IMAGE_HEIGHT` | `512` | Default height for generated images (SD 1.5 supports 512 or 768) |
+| `DEFAULT_CFG_SCALE` | `7` | Default CFG scale for image generation (1-35) |
+| `DEFAULT_STEPS` | `30` | Default number of generation steps (10-50) |
+| `DEFAULT_SAMPLES` | `1` | Default number of images to generate (1-4) |
 | `RATE_LIMIT_WINDOW_MS` | `900000` (15 min) | Rate limiting window |
 | `RATE_LIMIT_MAX` | `100` | Max requests per window |
+| `UPLOAD_PATH` | `./public/uploads` | Local storage path for images |
+| `MAX_FILE_UPLOAD` | `10` | Maximum file upload size in MB |
 
 For a complete list of all available environment variables, see the [.env.example](.env.example) file.
 
@@ -197,7 +205,63 @@ Authorization: Bearer <your_jwt_token>
 
 **Endpoint:** `POST /api/image/generate`
 
-Generate AI images using text prompts with Stability AI.
+Generate AI images using text prompts with Stability AI's Stable Diffusion v1.5 model.
+
+**Headers:**
+- `Authorization: Bearer <JWT_TOKEN>` (required)
+- `x-stability-api-key: <STABILITY_AI_API_KEY>` (required)
+- `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "prompt": "A beautiful sunset over mountains, digital art",
+  "negativePrompt": "blurry, low quality, distorted",
+  "width": 512,
+  "height": 512,
+  "samples": 1,
+  "steps": 30,
+  "cfgScale": 7,
+  "seed": 12345
+}
+```
+
+**Parameters:**
+- `prompt` (string, required): Text description of the image to generate
+- `negativePrompt` (string, optional): Text describing what to avoid in the image
+- `width` (number, optional): Width of the generated image (512 or 768)
+- `height` (number, optional): Height of the generated image (512 or 768)
+- `samples` (number, optional): Number of images to generate (1-4)
+- `steps` (number, optional): Number of diffusion steps (10-50)
+- `cfgScale` (number, optional): How strictly the diffusion process adheres to the prompt (1-35)
+- `seed` (number, optional): Random seed for reproducibility (0-4294967295)
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "images": [
+      {
+        "id": "507f1f77bcf86cd799439011",
+        "imageData": "data:image/png;base64,...",
+        "imageUrl": "https://your-storage.com/images/12345.png",
+        "prompt": "A beautiful sunset over mountains, digital art",
+        "createdAt": "2023-04-01T12:00:00.000Z"
+      }
+    ],
+    "coinsUsed": 5,
+    "remainingCoins": 45
+  }
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Missing or invalid parameters
+- `401 Unauthorized`: Invalid or missing API key
+- `402 Payment Required`: Insufficient credits
+- `429 Too Many Requests`: Rate limit exceeded
+- `500 Internal Server Error`: Server error
 
 **Headers:**
 ```

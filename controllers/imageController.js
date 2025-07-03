@@ -4,19 +4,47 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { ErrorResponse } = require('../utils/errorResponse');
+const { transformBufferObjects } = require('../utils/transformResponse');
 const Image = require('../models/Image');
 const User = require('../models/User');
 
 // Configuration from environment variables
-const COST_PER_IMAGE = process.env.COST_PER_IMAGE || 10; // Coins deducted per image generation
-const STABILITY_API_URL = process.env.STABILITY_API_URL || 'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image';
+const COST_PER_IMAGE = parseInt(process.env.COST_PER_IMAGE) || 5; // Reduced cost for SD 1.5
+const DEFAULT_MODEL = 'stable-diffusion-v1-5';
+const STABILITY_API_BASE_URL = process.env.STABILITY_API_URL?.split('/v1/')[0] || 'https://api.stability.ai';
+const STABILITY_API_URL = `${STABILITY_API_BASE_URL}/v1/generation/${DEFAULT_MODEL}/text-to-image`;
+const STABILITY_API_KEY_VALIDATION_URL = `${STABILITY_API_BASE_URL}/v1/user/account`;
 
-// Validate required environment variables
-const requiredEnvVars = ['STABILITY_API_KEY'];
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`Missing required environment variable: ${envVar}`);
-    process.exit(1);
+// Validation constants
+const API_KEY_PREFIX = 'sk-';
+const MIN_API_KEY_LENGTH = 40; // sk- prefix + at least 36 characters
+const VALID_DIMENSIONS = [512, 768]; // SD 1.5 works best with these dimensions
+
+/**
+ * Validates a Stability AI API key by making a test request
+ * @param {string} apiKey - The API key to validate
+ * @returns {Promise<boolean>} - True if valid, false otherwise
+ */
+async function validateStabilityApiKey(apiKey) {
+  if (!apiKey || typeof apiKey !== 'string' || 
+      !apiKey.startsWith(API_KEY_PREFIX) || 
+      apiKey.length < MIN_API_KEY_LENGTH) {
+    return false;
+  }
+
+  try {
+    const response = await axios.get(STABILITY_API_KEY_VALIDATION_URL, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json'
+      },
+      timeout: 5000 // 5 second timeout for validation
+    });
+    
+    return response.status === 200 && response.data?.email;
+  } catch (error) {
+    console.error('API key validation failed:', error.message);
+    return false;
   }
 }
 
@@ -36,30 +64,57 @@ exports.generateImage = async (req, res, next) => {
       return next(new ErrorResponse('Prompt is required', 400));
     }
 
+    // Get user's API key from headers
+    const apiKey = req.headers['x-stability-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+    
+    if (!apiKey) {
+      return next(new ErrorResponse('Stability AI API key is required. Please provide it in the x-stability-api-key header.', 400));
+    }
+
+    // Validate API key format
+    if (!apiKey.startsWith(API_KEY_PREFIX) || apiKey.length < MIN_API_KEY_LENGTH) {
+      return next(new ErrorResponse('Invalid API key format', 400));
+    }
+
     // Check user's coin balance
     const user = await User.findById(userId).session(session);
     if (user.coins < COST_PER_IMAGE) {
       return next(new ErrorResponse('Insufficient coins', 400));
     }
+    
+    // Validate dimensions for SD 1.5
+    const imgWidth = parseInt(width);
+    const imgHeight = parseInt(height);
+    
+    if (!VALID_DIMENSIONS.includes(imgWidth) || !VALID_DIMENSIONS.includes(imgHeight)) {
+      return next(new ErrorResponse(
+        `SD 1.5 only supports the following dimensions: ${VALID_DIMENSIONS.join('x')}`, 
+        400
+      ));
+    }
 
-    // Prepare the request payload
+    // Prepare the request payload for SD 1.5
     const payload = {
       text_prompts: [
         {
-          text: prompt,
+          text: prompt.trim(),
           weight: 1.0
         }
       ],
-      cfg_scale: cfgScale || parseInt(process.env.DEFAULT_CFG_SCALE) || 7,
-      height: height || parseInt(process.env.DEFAULT_IMAGE_HEIGHT) || 1024,
-      width: width || parseInt(process.env.DEFAULT_IMAGE_WIDTH) || 1024,
-      samples: samples || parseInt(process.env.DEFAULT_SAMPLES) || 1,
-      steps: steps || parseInt(process.env.DEFAULT_STEPS) || 50,
-      style_preset: stylePreset || process.env.DEFAULT_STYLE_PRESET || 'enhance',
-      seed: seed || Math.floor(Math.random() * 1000000)
+      cfg_scale: Math.min(Math.max(parseFloat(cfgScale) || 7, 1), 35), // Clamp 1-35
+      height: imgHeight,
+      width: imgWidth,
+      samples: Math.min(parseInt(samples) || 1, 4), // Max 4 samples per request
+      steps: Math.min(Math.max(parseInt(steps) || 30, 10), 50), // Clamp 10-50 steps
+      seed: seed || Math.floor(Math.random() * 4294967295) // Full 32-bit range
     };
 
-    // Only add negative prompt if it's not empty
+    // SD 1.5 handles negative prompts differently
+    const fullPrompt = negativePrompt && negativePrompt.trim() !== ''
+      ? `${prompt} ### ${negativePrompt}`
+      : prompt;
+      
+    payload.text_prompts[0].text = fullPrompt.trim();
     if (negativePrompt && negativePrompt.trim() !== '') {
       payload.text_prompts.push({
         text: negativePrompt.trim(),
@@ -68,6 +123,9 @@ exports.generateImage = async (req, res, next) => {
     }
 
     // Call Stability AI API
+    console.log('Calling Stability AI API with payload:', JSON.stringify(payload, null, 2));
+    console.log('API URL:', STABILITY_API_URL);
+    
     const response = await axios.post(
       STABILITY_API_URL,
       payload,
@@ -75,14 +133,45 @@ exports.generateImage = async (req, res, next) => {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${process.env.STABILITY_API_KEY}`
+          'Accept-Version': '2023-08-16-preview',
+          'Authorization': `Bearer ${apiKey}`
         },
         responseType: 'json',
         timeout: parseInt(process.env.STABILITY_API_TIMEOUT) || 30000
       }
-    );
+    ).catch(error => {
+      console.error('Stability AI API Error:', {
+        message: error.message,
+        response: error.response ? {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        } : 'No response',
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers ? {
+            ...error.config.headers,
+            'Authorization': '[REDACTED]' // Don't log the actual API key
+          } : 'No headers',
+          data: error.config?.data
+        }
+      });
+      throw error;
+    });
+    
+    console.log('Stability AI API Response Status:', response.status);
+    console.log('Response data keys:', Object.keys(response.data));
+    console.log('Response data.artifacts exists:', !!response.data.artifacts);
+    if (response.data.artifacts) {
+      console.log('Artifacts array length:', response.data.artifacts.length);
+      if (response.data.artifacts.length > 0) {
+        console.log('First artifact keys:', Object.keys(response.data.artifacts[0]));
+      }
+    }
 
     if (!response.data.artifacts || !response.data.artifacts.length) {
+      console.error('No artifacts in response:', JSON.stringify(response.data, null, 2));
       throw new Error('No image was generated by the AI service');
     }
     
@@ -102,8 +191,15 @@ exports.generateImage = async (req, res, next) => {
     for (const artifact of response.data.artifacts) {
       const imageId = uuidv4();
       
-      // Save image to storage (optional, if you still want to store it)
-      const imageUrl = await saveImageToStorage(artifact.base64, imageId);
+      // Save image to storage
+      let imageUrl;
+      try {
+        imageUrl = await saveImageToStorage(artifact.base64, imageId);
+      } catch (storageError) {
+        console.error('Failed to save image to storage:', storageError);
+        // Continue with the response even if storage fails, as we still have the base64 data
+        imageUrl = null;
+      }
       
       // Create image record in database
       const newImage = new Image({
@@ -140,20 +236,44 @@ exports.generateImage = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(201).json({
+    // Prepare the response
+    const responseData = {
       success: true,
       data: {
         images: imageArtifacts,
         coinsUsed: COST_PER_IMAGE * imageArtifacts.length,
         remainingCoins: user.coins
       }
-    });
+    };
+
+    // Transform buffer objects in the response
+    const transformedResponse = transformBufferObjects(responseData);
+
+    res.status(201).json(transformedResponse);
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
     
-    console.error('Image generation error:', error);
-    next(new ErrorResponse('Failed to generate image', 500));
+    console.error('Image generation error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      response: error.response?.data,
+      status: error.response?.status,
+      config: error.config ? {
+        url: error.config.url,
+        method: error.config.method,
+        headers: error.config.headers ? {
+          ...error.config.headers,
+          'Authorization': error.config.headers.Authorization ? '[REDACTED]' : undefined
+        } : {},
+        data: error.config.data
+      } : {}
+    });
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to generate image';
+    next(new ErrorResponse(`Image generation failed: ${errorMessage}`, error.response?.status || 500));
   }
 };
 

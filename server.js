@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const { formatResponse } = require('./utils/formatResponse');
+const { stringifyResponse } = require('./utils/stringifyAllValues');
 
 // Load environment variables
 dotenv.config();
@@ -28,8 +28,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Format MongoDB documents in responses
-app.use(formatResponse);
+// Convert all response values to strings
+app.use(stringifyResponse);
 
 // Create uploads directory if it doesn't exist
 const fs = require('fs');

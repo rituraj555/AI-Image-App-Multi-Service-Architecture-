@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
 const { formatDocument } = require('../utils/formatResponse');
+const { transformBufferObjects } = require('../utils/transformResponse');
 
 // Validate required environment variables
 const requiredEnvVars = ['JWT_SECRET', 'JWT_EXPIRE', 'NODE_ENV'];
@@ -38,8 +39,8 @@ exports.register = async (req, res, next) => {
     // Generate JWT token
     const token = generateToken(user._id);
 
-    // Format the response document
-    const response = formatDocument({
+    // Create response object
+    const responseData = {
       success: true,
       token,
       id: user._id,
@@ -49,9 +50,13 @@ exports.register = async (req, res, next) => {
         email: user.email,
         createdAt: user.createdAt
       }
-    });
+    };
     
-    res.status(201).json(response);
+    // Format and transform the response document
+    const formattedResponse = formatDocument(responseData);
+    const transformedResponse = transformBufferObjects(formattedResponse);
+    
+    res.status(201).json(transformedResponse);
   } catch (error) {
     next(error);
   }
@@ -87,8 +92,8 @@ exports.login = async (req, res, next) => {
     // Generate JWT token
     const token = generateToken(user._id);
 
-    // Format the response document
-    const response = formatDocument({
+    // Create response object
+    const responseData = {
       success: true,
       token,
       id: user._id,
@@ -98,9 +103,13 @@ exports.login = async (req, res, next) => {
         email: user.email,
         createdAt: user.createdAt
       }
-    });
+    };
     
-    res.status(200).json(response);
+    // Format and transform the response document
+    const formattedResponse = formatDocument(responseData);
+    const transformedResponse = transformBufferObjects(formattedResponse);
+    
+    res.status(200).json(transformedResponse);
   } catch (error) {
     next(error);
   }
@@ -113,15 +122,23 @@ exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     
-    res.status(200).json({
+    // Create response object
+    const responseData = {
       success: true,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
+        coins: user.coins,
         createdAt: user.createdAt
       }
-    });
+    };
+    
+    // Format and transform the response document
+    const formattedResponse = formatDocument(responseData);
+    const transformedResponse = transformBufferObjects(formattedResponse);
+    
+    res.status(200).json(transformedResponse);
   } catch (error) {
     next(error);
   }
