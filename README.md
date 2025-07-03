@@ -1,31 +1,271 @@
 <div align="center">
   <h1>🎨 AI Image Generation Backend</h1>
-  <p>Scalable microservices backend for AI-powered image generation with coin and subscription models</p>
+  <p>Scalable backend for AI-powered image generation with coin-based access control</p>
   
   [![Node.js](https://img.shields.io/badge/Node.js-18.x-339933?logo=nodedotjs)](https://nodejs.org/)
   [![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express)](https://expressjs.com/)
   [![MongoDB](https://img.shields.io/badge/MongoDB-5.0-47A248?logo=mongodb)](https://www.mongodb.com/)
-  [![AWS Elastic Beanstalk](https://img.shields.io/badge/AWS-Elastic%20Beanstalk-FF9900?logo=amazonaws)](https://aws.amazon.com/elasticbeanstalk/)
+  [![Swagger](https://img.shields.io/badge/Swagger-85EA2D?logo=swagger&logoColor=white)](https://swagger.io/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
 ## 📄 Description
 
-A robust, scalable backend system for an AI-powered image generation application. This project follows a microservices architecture with separate services for authentication, user management, coin transactions, AI image generation, and subscription handling.
+A robust, scalable backend system for an AI-powered image generation application. This project provides a RESTful API for generating AI images using **Stability AI's Stable Diffusion XL 1.0 model**, with built-in user authentication, coin-based access control, and comprehensive API documentation.
 
-## 🚀 Recent Updates (v2.0.0)
+## 🚀 Features
 
-### Major Updates
-- **Switched to Stable Diffusion v1.5** for more cost-effective image generation
-- **User-Provided API Keys**: Users can now use their own Stability AI API keys
-- **Optimized for Mobile**: Reduced data usage with smaller image sizes by default
+### 🖼️ AI Image Generation
+- **Stable Diffusion XL 1.0** for high-quality, high-resolution image generation.
+- **Multiple Styles**: Support for various artistic styles (e.g., `realistic`, `cartoon`, `anime`).
+- **Customizable Parameters**: Control over CFG scale, steps, and seed.
+- **Supported Dimensions**: The SDXL 1.0 model supports specific image dimensions:
+  - `1024x1024` (Default)
+  - `1152x896`
+  - `1216x832`
+  - `1344x768`
+  - `1536x640`
+  - `640x1536`
+  - `768x1344`
+  - `832x1216`
+  - `896x1152`
+- **Negative Prompts**: Fine-tune image generation with negative prompts.
 
-### Image Generation Improvements
-- **Cost-Effective**: Optimized defaults for faster and cheaper generation
-- **Enhanced Validation**: Better input validation for dimensions and parameters
-- **Improved Error Handling**: More descriptive error messages
-- **Efficient Storage**: Optimized image storage and retrieval
-- **API Key Validation**: Basic validation for user-provided API keys
+### 🔐 Authentication & Security
+- **JWT-based Authentication** with secure token handling.
+- **Role-based Access Control** (User, Admin).
+- **Rate Limiting** on sensitive endpoints to prevent abuse.
+- **Input Validation** for all API endpoints.
+- **Secure API Key Storage**: User-provided Stability AI keys are encrypted before being stored.
+
+### 💰 Coin System
+- **Earn Coins**: Users can earn coins through in-app actions (e.g., watching ads).
+- **Purchase Coins**: In-app purchases for coin bundles.
+- **Cost-Based Access**: Image generation deducts a fixed number of coins.
+- **Transaction History**: Users can view their complete coin transaction history.
+
+### 📚 API Documentation
+- **Interactive Swagger UI** available at `/api-docs`.
+- **OpenAPI 3.0** specification for clear, standardized documentation.
+- **Live Testing**: Test API endpoints directly from the browser.
+
+## 🔧 Setup & Installation
+
+### Prerequisites
+- Node.js 18.x or later
+- MongoDB 5.0 or later
+- Stability AI API key
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/yourusername/ai-image-generator-backend.git
+    cd ai-image-generator-backend
+    ```
+
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Configure environment variables**
+    Create a `.env` file by copying the example and fill in your configuration details.
+    ```bash
+    cp .env.example .env
+    ```
+    > **Note**: Edit `.env` with your `MONGO_URI`, `JWT_SECRET`, `STABILITY_API_KEY`, and other required values.
+
+4.  **Start the development server**
+    ```bash
+    npm run dev
+    ```
+
+5.  **Access the API documentation**
+    - Open `http://localhost:8000/api-docs` in your browser (the port may vary based on your `.env` config).
+
+## 🧪 Testing
+
+This project uses Jest for automated testing. Tests run against an in-memory MongoDB server to avoid interfering with your development database.
+
+- **Run all tests:**
+  ```bash
+  npm test
+  ```
+- **Run tests in watch mode:**
+  ```bash
+  npm run test:watch
+  ```
+
+## 📚 API Endpoints
+
+All endpoints are prefixed with `/api`. Authentication is required for all routes except for `POST /auth/register` and `POST /auth/login`.
+
+| Method | Endpoint                    | Description                               |
+|--------|-----------------------------|-------------------------------------------|
+| `POST` | `/auth/register`            | Register a new user.                      |
+| `POST` | `/auth/login`               | Login and receive a JWT token.            |
+| `GET`  | `/auth/me`                  | Get the current authenticated user's profile. |
+| `POST` | `/image/generate`           | Generate a new AI image.                  |
+| `GET`  | `/image/history`            | Get the user's image generation history.  |
+| `POST` | `/coin/earn`                | Earn coins (e.g., after watching an ad).  |
+| `POST` | `/coin/buy`                 | Record a coin purchase.                   |
+| `GET`  | `/coin/history`             | Get the user's coin transaction history.  |
+| `GET`  | `/coin/balance`             | Get the user's current coin balance.      |
+| `POST` | `/api-key`                  | Save or update a user's Stability AI API key. |
+| `GET`  | `/api-key`                  | Retrieve the user's saved API key (encrypted). |
+| `DELETE`| `/api-key`                  | Delete the user's saved API key.          |
+| `POST` | `/subscription/verify`      | Verify a Google Play Store subscription.  |
+
+> For detailed request/response schemas and to try out the endpoints, please visit the **[Swagger UI Documentation](#-api-documentation)**.
+
+## 🏗️ Architecture
+
+The backend follows a modular, layered architecture to separate concerns and improve maintainability:
+
+-   **`config`**: Database connection and environment variable management.
+-   **`controllers`**: Business logic for handling requests.
+-   **`docs`**: Swagger API documentation setup.
+-   **`middleware`**: Request processing middleware (authentication, error handling, validation).
+-   **`models`**: Mongoose schemas for database models.
+-   **`routes`**: Express route definitions.
+-   **`services`**: Logic for interacting with external services (e.g., Stability AI).
+-   **`tests`**: Jest test suites for API endpoints.
+-   **`utils`**: Helper functions and utilities.
+
+## 🚀 Deployment
+
+This application is ready for deployment on platforms like AWS Elastic Beanstalk, Heroku, or any service that supports Node.js.
+
+### Production Deployment Steps (Example: AWS)
+
+1.  **Set environment to production** in your `.env` file.
+2.  **Install AWS EB CLI**.
+3.  **Initialize Elastic Beanstalk**: `eb init -p "Node.js" --region your-region`
+4.  **Create an environment**: `eb create your-env-name`
+5.  **Set environment variables** in the Elastic Beanstalk console or via the CLI.
+6.  **Deploy**: `eb deploy`
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a pull request or open an issue for any bugs or feature requests.
+
+## 📜 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+- `GET /image/history` - Get user's image generation history
+- `GET /image/:id` - Get a specific generated image
+- `DELETE /image/:id` - Delete a generated image
+
+#### API Keys
+- `POST /apikey/save` - Save or update Stability AI API key
+- `GET /apikey/info` - Get API key info (does not expose the key)
+- `DELETE /apikey/remove` - Remove API key
+
+#### Coins
+- `POST /coin/add` - Add coins by watching an ad
+- `POST /coin/buy` - Purchase coins
+- `GET /coin/balance` - Get current coin balance
+- `GET /coin/transactions` - Get transaction history
+
+## 🛡️ Security
+
+### Rate Limiting
+- Authentication endpoints: 50 requests per 15 minutes
+- API key operations: 10 requests per hour
+- Image generation: 30 requests per 15 minutes
+- Coin operations: 20 requests per hour
+
+### Input Validation
+All user inputs are validated using `express-validator` to prevent injection attacks and ensure data integrity.
+
+### Data Protection
+- Passwords are hashed using bcrypt
+- API keys are encrypted before storage
+- Sensitive data is never logged
+
+## 📦 Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+# Server
+NODE_ENV=development
+PORT=8000
+
+# MongoDB
+MONGODB_URI=mongodb://localhost:27017/ai_image_generator
+
+# JWT
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRE=30d
+JWT_COOKIE_EXPIRE=30
+
+# Stability AI
+STABILITY_API_KEY=your_stability_ai_api_key
+STABILITY_API_HOST=api.stability.ai
+
+# File Upload
+MAX_FILE_UPLOAD=10 # MB
+FILE_UPLOAD_PATH=./public/uploads
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000 # 15 minutes
+RATE_LIMIT_MAX_REQUESTS=100
+
+# CORS
+CORS_ORIGIN=http://localhost:3000
+```
+
+## 🚀 Deployment
+
+### Production Deployment
+
+1. **Set environment to production**
+   ```bash
+   NODE_ENV=production
+   ```
+
+2. **Build the application**
+   ```bash
+   npm run build
+   ```
+
+3. **Start the production server**
+   ```bash
+   npm start
+   ```
+
+### Docker Deployment
+
+1. **Build the Docker image**
+   ```bash
+   docker build -t ai-image-generator .
+   ```
+
+2. **Run the container**
+   ```bash
+   docker run -d -p 8000:8000 --env-file .env ai-image-generator
+   ```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a new branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Stability AI](https://stability.ai/) for their amazing AI models
+- [Express.js](https://expressjs.com/) for the web framework
+- [MongoDB](https://www.mongodb.com/) for the database
+- [Swagger](https://swagger.io/) for API documentation
 
 ### ✨ Key Features
 - 🔐 **Secure Authentication** with JWT
@@ -40,24 +280,18 @@ A robust, scalable backend system for an AI-powered image generation application
   - Image history and management
   - Rate limiting and request validation
 
-## 🔑 API Key Requirements
+## 🔑 API Key Configuration
 
 ### Stability AI API Key
-- **Required for all image generation endpoints**
-- Must be included in the `x-stability-api-key` header
-- Minimum balance required: $0.02 USD
-- Get your API key: [Stability AI Dashboard](https://platform.stability.ai/account/keys)
-- Add credits: [Stability AI Billing](https://platform.stability.ai/account/billing)
+- **Automatically managed by the backend**
+- No need to provide an API key in requests
+- The backend uses its own Stability AI API key from environment variables
+- Server admin must ensure sufficient balance for image generation
 
-### Cost Estimates
+### Cost Estimates (for server admin)
 - 512x512 image (10 steps): ~$0.01 USD
 - 768x768 image (10 steps): ~$0.02 USD
 - 1024x1024 image (10 steps): ~$0.04 USD
-
-### Check Your Balance
-```bash
-node checkBalance.js
-```
 
 ## 🔧 Environment Variables
 
@@ -229,7 +463,6 @@ Generate AI images using text prompts with Stability AI's Stable Diffusion v1.5 
 
 **Headers:**
 - `Authorization: Bearer <JWT_TOKEN>` (required)
-- `x-stability-api-key: <STABILITY_AI_API_KEY>` (required)
 - `Content-Type: application/json`
 
 **Request Body:**
@@ -677,7 +910,7 @@ const imageUrl = await uploadToS3(
 ### 🖼️ Image Generation Service
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
-| `POST` | `/api/image/generate` | Generate AI image (returns base64 data) | ✅ |
+| `POST` | `/api/image/generate` | Generate AI image (returns base64 data) | ✅ (uses server's API key) |
 | `GET` | `/api/image/history` | Get generation history | ✅ |
 | `GET` | `/api/image/:id` | Get specific image details | ✅ |
 | `DELETE` | `/api/image/:id` | Delete generated image | ✅ |
