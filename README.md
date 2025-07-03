@@ -16,20 +16,27 @@ A robust, scalable backend system for an AI-powered image generation application
 ## 🚀 Features
 
 ### 🖼️ AI Image Generation
-- **Stable Diffusion XL 1.0** for high-quality, high-resolution image generation.
+- **Multiple AI Models**:
+  - **Stable Diffusion v1.5** - Fast and cost-effective image generation (1 credit per image)
+  - **Stable Diffusion XL 1.0** - High-quality, high-resolution image generation
 - **Multiple Styles**: Support for various artistic styles (e.g., `realistic`, `cartoon`, `anime`).
-- **Customizable Parameters**: Control over CFG scale, steps, and seed.
-- **Supported Dimensions**: The SDXL 1.0 model supports specific image dimensions:
-  - `1024x1024` (Default)
-  - `1152x896`
-  - `1216x832`
-  - `1344x768`
-  - `1536x640`
-  - `640x1536`
-  - `768x1344`
-  - `832x1216`
-  - `896x1152`
+- **Customizable Parameters**: Control over CFG scale, steps, seed, and dimensions.
+- **Supported Dimensions**:
+  - **SD v1.5**:
+    - Default: `512x512`
+    - Other square dimensions supported (up to 1024x1024)
+  - **SDXL 1.0**:
+    - `1024x1024` (Default)
+    - `1152x896`
+    - `1216x832`
+    - `1344x768`
+    - `1536x640`
+    - `640x1536`
+    - `768x1344`
+    - `832x1216`
+    - `896x1152`
 - **Negative Prompts**: Fine-tune image generation with negative prompts.
+- **Cost-Effective**: Choose between different models based on quality and cost requirements.
 
 ### 🔐 Authentication & Security
 - **JWT-based Authentication** with secure token handling.
@@ -37,6 +44,7 @@ A robust, scalable backend system for an AI-powered image generation application
 - **Rate Limiting** on sensitive endpoints to prevent abuse.
 - **Input Validation** for all API endpoints.
 - **Secure API Key Storage**: User-provided Stability AI keys are encrypted before being stored.
+- **API Key Validation**: Automatically validates Stability AI keys before use.
 
 ### 💰 Coin System
 - **Earn Coins**: Users can earn coins through in-app actions (e.g., watching ads).
@@ -54,7 +62,8 @@ A robust, scalable backend system for an AI-powered image generation application
 ### Prerequisites
 - Node.js 18.x or later
 - MongoDB 5.0 or later
-- Stability AI API key
+- Stability AI API key (required for image generation)
+  - Get your API key from [Stability AI Platform](https://platform.stability.ai/)
 
 ### Installation
 
@@ -88,6 +97,24 @@ A robust, scalable backend system for an AI-powered image generation application
 
 This project uses Jest for automated testing. Tests run against an in-memory MongoDB server to avoid interfering with your development database.
 
+### Test the Image Generation Endpoint
+
+```bash
+curl -X POST http://localhost:5000/api/image/generate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "prompt": "a cyberpunk warrior in anime style",
+    "negativePrompt": "blurry, low quality",
+    "steps": 30,
+    "cfg_scale": 7,
+    "width": 512,
+    "height": 512,
+    "samples": 1
+  }'
+```
+
+### Running Tests
 - **Run all tests:**
   ```bash
   npm test
@@ -98,6 +125,223 @@ This project uses Jest for automated testing. Tests run against an in-memory Mon
   ```
 
 ## 📚 API Endpoints
+
+### 🔐 Authentication
+
+#### Register a New User
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "securePassword123"
+}
+
+# Response (201 Created)
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### User Login
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "securePassword123"
+}
+
+# Response (200 OK)
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### 🔑 API Key Management
+
+#### Save/Update API Key
+```http
+POST /api/apikey/save
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "apiKey": "sk-your-stability-ai-api-key"
+}
+
+# Response (200 OK)
+{
+  "success": true,
+  "message": "API key saved successfully"
+}
+```
+
+### 🖼️ Image Generation
+
+#### Generate AI Image
+```http
+POST /api/image/generate
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "prompt": "a cyberpunk city at night, neon lights, rain, 4k",
+  "negativePrompt": "blurry, low quality, text, watermark",
+  "width": 512,
+  "height": 512,
+  "steps": 30,
+  "cfg_scale": 7,
+  "samples": 1
+}
+
+# Response (200 OK)
+{
+  "success": true,
+  "data": {
+    "images": [{
+      "id": "60d5ec9cf4b3f10015e8a7b2",
+      "imageData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNTCA...",
+      "prompt": "a cyberpunk city at night, neon lights, rain, 4k",
+      "createdAt": "2023-06-28T10:30:00.000Z"
+    }],
+    "coinsUsed": 10,
+    "remainingCoins": 90
+  }
+}
+```
+
+### 💰 Coin Management
+
+#### Earn Coins
+```http
+POST /api/coin/earn
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "amount": 10,
+  "source": "ad_watch"
+}
+
+# Response (200 OK)
+{
+  "success": true,
+  "data": {
+    "balance": 100,
+    "transaction": {
+      "type": "earn",
+      "amount": 10,
+      "source": "ad_watch",
+      "balanceAfter": 100,
+      "timestamp": "2023-06-28T10:30:00.000Z"
+    }
+  }
+}
+```
+
+### 🔄 Subscription
+
+#### Verify Subscription
+```http
+POST /api/subscription/verify
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "subscriptionId": "com.example.subscription.premium",
+  "purchaseToken": "purchase_token_here",
+  "packageName": "com.example.app"
+}
+
+# Response (200 OK)
+{
+  "success": true,
+  "data": {
+    "subscriptionActive": true,
+    "expiryDate": "2023-12-31T23:59:59.000Z"
+  }
+}
+```
+
+### 👤 User Profile
+
+#### Get User Profile
+```http
+GET /api/user/profile
+Authorization: Bearer <token>
+
+# Response (200 OK)
+{
+  "success": true,
+  "data": {
+    "id": "60d5ec9cf4b3f10015e8a7b1",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "coins": 100,
+    "subscription": {
+      "active": true,
+      "plan": "premium",
+      "expiresAt": "2023-12-31T23:59:59.000Z"
+    },
+    "createdAt": "2023-01-15T10:30:00.000Z"
+  }
+}
+```
+
+### 🔐 Authentication
+
+| Method | Endpoint | Description | Authentication Required |
+|--------|----------|-------------|--------------------------|
+| `POST` | `/api/auth/register` | Register a new user | No |
+| `POST` | `/api/auth/login` | Login user and get JWT token | No |
+| `GET` | `/api/auth/me` | Get current user's profile | Yes |
+
+### 🔑 API Key Management
+
+| Method | Endpoint | Description | Authentication Required |
+|--------|----------|-------------|--------------------------|
+| `POST` | `/api/apikey/save` | Save or update Stability AI API key | Yes |
+| `GET` | `/api/apikey` | Get user's API key (encrypted) | Yes |
+| `DELETE` | `/api/apikey` | Delete user's API key | Yes |
+
+### 🖼️ Image Generation
+
+| Method | Endpoint | Description | Authentication Required |
+|--------|----------|-------------|--------------------------|
+| `POST` | `/api/image/generate` | Generate AI image | Yes |
+| `GET` | `/api/image/history` | Get user's image generation history | Yes |
+| `GET` | `/api/image/:id` | Get a specific generated image | Yes |
+| `DELETE` | `/api/image/:id` | Delete a generated image | Yes |
+
+### 💰 Coin Management
+
+| Method | Endpoint | Description | Authentication Required |
+|--------|----------|-------------|--------------------------|
+| `POST` | `/api/coin/earn` | Earn coins (e.g., watching ads) | Yes |
+| `POST` | `/api/coin/buy` | Purchase coins | Yes |
+| `GET` | `/api/coin/balance` | Get user's coin balance | Yes |
+| `GET` | `/api/coin/transactions` | Get transaction history | Yes |
+
+### 🔄 Subscription
+
+| Method | Endpoint | Description | Authentication Required |
+|--------|----------|-------------|--------------------------|
+| `POST` | `/api/subscription/verify` | Verify Google Play subscription | Yes |
+| `GET` | `/api/subscription/status` | Get subscription status | Yes |
+
+### 👤 User Profile
+
+| Method | Endpoint | Description | Authentication Required |
+|--------|----------|-------------|--------------------------|
+| `GET` | `/api/user/profile` | Get user profile | Yes |
+| `PUT` | `/api/user/profile` | Update user profile | Yes |
+| `DELETE` | `/api/user` | Delete user account | Yes |
 
 All endpoints are prefixed with `/api`. Authentication is required for all routes except for `POST /auth/register` and `POST /auth/login`.
 
