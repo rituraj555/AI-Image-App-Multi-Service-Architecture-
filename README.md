@@ -40,6 +40,25 @@ A robust, scalable backend system for an AI-powered image generation application
   - Image history and management
   - Rate limiting and request validation
 
+## 🔑 API Key Requirements
+
+### Stability AI API Key
+- **Required for all image generation endpoints**
+- Must be included in the `x-stability-api-key` header
+- Minimum balance required: $0.02 USD
+- Get your API key: [Stability AI Dashboard](https://platform.stability.ai/account/keys)
+- Add credits: [Stability AI Billing](https://platform.stability.ai/account/billing)
+
+### Cost Estimates
+- 512x512 image (10 steps): ~$0.01 USD
+- 768x768 image (10 steps): ~$0.02 USD
+- 1024x1024 image (10 steps): ~$0.04 USD
+
+### Check Your Balance
+```bash
+node checkBalance.js
+```
+
 ## 🔧 Environment Variables
 
 This application uses environment variables for configuration. Here's a breakdown of the key variables:
@@ -48,6 +67,7 @@ This application uses environment variables for configuration. Here's a breakdow
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `NODE_ENV` | Application environment | `development`, `production` |
+| `STABILITY_API_KEY` | Your Stability AI API key | `sk-...` |
 | `PORT` | Port to run the server | `8000` |
 | `MONGO_URI` | MongoDB connection string | `mongodb+srv://...` |
 | `JWT_SECRET` | Secret for JWT token signing | `your_secure_secret` |
