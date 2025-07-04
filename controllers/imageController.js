@@ -285,13 +285,14 @@ exports.generateImage = async (req, res, next) => {
       let imageUrl = null;
       
       try {
-        // Only save to storage temporarily if we have base64 data
+        // Save the image to storage permanently
         if (artifact.base64) {
           imageUrl = await saveImageToStorage(artifact.base64, imageId);
+          console.log(`Image saved to storage: ${imageUrl}`);
         }
       } catch (storageError) {
         console.error('Failed to save image to storage:', storageError);
-        // Continue with the response even if storage fails
+        throw new Error('Failed to save the generated image to storage');
       }
       
       // Create image record in database
@@ -316,12 +317,12 @@ exports.generateImage = async (req, res, next) => {
 
       await newImage.save({ session });
       
-      // Prepare response data
+      // Prepare response data (without base64)
       const imageData = {
         id: newImage._id,
         imageId: newImage.imageId,
         prompt: newImage.prompt,
-        imageUrl: newImage.imageUrl,
+        imageUrl: `/api/image/download/${newImage.imageId}`, // Use download endpoint
         size: newImage.size,
         model: newImage.model,
         stylePreset: newImage.stylePreset,
@@ -332,8 +333,7 @@ exports.generateImage = async (req, res, next) => {
         samples: newImage.samples,
         coinsUsed: COST_PER_IMAGE_SD16,
         createdAt: newImage.createdAt,
-        // Include base64 data in the response if available
-        ...(artifact.base64 && { imageData: `data:image/png;base64,${artifact.base64}` })
+        downloaded: newImage.downloaded
       };
       
       imageArtifacts.push(imageData);
@@ -357,20 +357,9 @@ exports.generateImage = async (req, res, next) => {
     const transformedResponse = transformBufferObjects ? 
       transformBufferObjects(responseData) : responseData;
 
-    // Send the response with base64 data
+    // Send the response with image metadata (no base64)
+    // Images can be downloaded once via the downloadUrl
     res.status(201).json(transformedResponse);
-    
-    // After sending the response, delete the images from storage
-    try {
-      for (const image of imageArtifacts) {
-        if (image.imageId) {
-          await deleteImageFromStorage(image.imageId);
-        }
-      }
-    } catch (deleteError) {
-      console.error('Error deleting images after sending:', deleteError);
-      // Continue even if deletion fails
-    }
   } catch (error) {
     await session.abortTransaction().catch(console.error);
     session.endSession().catch(console.error);
@@ -468,47 +457,132 @@ exports.getImageHistory = async (req, res, next) => {
 };
 
 /**
+ * @desc    Download a generated image (one-time download)
+ * @route   GET /api/image/download/:imageId
+ * @access  Private
+ * @param   {Object} req - Express request object
+ * @param   {Object} res - Express response object
+ * @param   {Function} next - Express next middleware function
+ * @returns {Stream} Image file download
+ */
+exports.downloadImage = async (req, res, next) => {
+  const session = await Image.startSession();
+  session.startTransaction();
+  
+  try {
+    const image = await Image.findOne({
+      imageId: req.params.imageId,
+      userId: req.user.id
+    }).session(session);
+
+    if (!image) {
+      await session.abortTransaction();
+      session.endSession();
+      return next(new ErrorResponse('Image not found', 404));
+    }
+
+    // Check if image has already been downloaded
+    if (image.downloaded) {
+      await session.abortTransaction();
+      session.endSession();
+      return next(new ErrorResponse('This image has already been downloaded and is no longer available', 410));
+    }
+
+    // Mark image as downloaded
+    image.downloaded = true;
+    await image.save({ session });
+    
+    // Get the file path
+    const filePath = path.join(__dirname, `../public/uploads/${image.imageId}.png`);
+    
+    // Set headers for file download
+    res.setHeader('Content-Disposition', `attachment; filename="${image.imageId}.png"`);
+    res.setHeader('Content-Type', 'image/png');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    
+    // When the stream ends, delete the file
+    fileStream.on('end', async () => {
+      try {
+        // Delete the file after streaming
+        await fs.promises.unlink(filePath);
+        await session.commitTransaction();
+        session.endSession();
+      } catch (error) {
+        console.error('Error deleting image after download:', error);
+        await session.abortTransaction();
+        session.endSession();
+      }
+    });
+    
+    // Handle stream errors
+    fileStream.on('error', async (error) => {
+      console.error('Error streaming image:', error);
+      await session.abortTransaction();
+      session.endSession();
+      next(new ErrorResponse('Error streaming image', 500));
+    });
+    
+    // Pipe the file to the response
+    fileStream.pipe(res);
+    
+  } catch (error) {
+    await session.abortTransaction().catch(console.error);
+    session.endSession().catch(console.error);
+    
+    console.error(`Error downloading image ${req.params.imageId}:`, error);
+    next(new ErrorResponse('Failed to download image', 500));
+  }
+};
+
+/**
  * @desc    Get a single generated image by ID
  * @route   GET /api/image/:id
  * @access  Private
  * @param   {Object} req - Express request object
  * @param   {Object} res - Express response object
  * @param   {Function} next - Express next middleware function
- * @returns {Object} JSON response with the requested image
+ * @returns {Object} JSON response with the requested image metadata
  */
 exports.getImage = async (req, res, next) => {
   try {
     const image = await Image.findOne({
       _id: req.params.id,
       userId: req.user.id
-    }).select('-__v -updatedAt').lean();
+    });
 
     if (!image) {
       return next(new ErrorResponse('Image not found', 404));
     }
 
-    // Sanitize the response
-    const sanitizedImage = {
-      id: image._id,
-      imageId: image.imageId,
-      prompt: image.prompt,
-      imageUrl: image.imageUrl,
-      size: image.size,
-      model: image.model,
-      stylePreset: image.stylePreset,
-      negativePrompt: image.negativePrompt,
-      cfgScale: image.cfgScale,
-      steps: image.steps,
-      seed: image.seed,
-      samples: image.samples,
-      coinsUsed: image.coinsUsed,
-      createdAt: image.createdAt
+    // Check if image has been downloaded
+    if (image.downloaded) {
+      return next(new ErrorResponse('This image has already been downloaded and is no longer available', 410));
+    }
+
+    const response = {
+      success: true,
+      data: {
+        id: image._id,
+        imageId: image.imageId,
+        prompt: image.prompt,
+        downloadUrl: `/api/image/download/${image.imageId}`,
+        size: image.size,
+        model: image.model,
+        stylePreset: image.stylePreset,
+        negativePrompt: image.negativePrompt,
+        cfgScale: image.cfgScale,
+        steps: image.steps,
+        seed: image.seed,
+        samples: image.samples,
+        coinsUsed: image.coinsUsed,
+        createdAt: image.createdAt,
+        downloaded: image.downloaded
+      }
     };
 
-    res.status(200).json({
-      success: true,
-      data: sanitizedImage
-    });
+    res.status(200).json(response);
   } catch (error) {
     console.error(`Error fetching image ${req.params.id}:`, error);
     

@@ -4,7 +4,8 @@ const {
   generateImage,
   getImageHistory,
   getImage,
-  deleteImage
+  deleteImage,
+  downloadImage
 } = require('../controllers/imageController');
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.use(protect);
 // Image generation and management routes
 router.post('/generate', generateImage);
 router.get('/history', getImageHistory);
+router.get('/download/:imageId', downloadImage); // One-time download endpoint
 router.get('/:id', getImage);
 router.delete('/:id', deleteImage);
 

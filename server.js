@@ -87,26 +87,26 @@ app.use((req, res) => {
 });
 
 // Connect to MongoDB and start server
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT
 
+// Start server
 const startServer = async () => {
   try {
+    // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log('MongoDB connected');
+    console.log('MongoDB Connected...');
 
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-      
-      // Log environment variables (except sensitive ones)
-      console.log('Environment:', process.env.NODE_ENV || 'development');
-      console.log('MongoDB:', process.env.MONGO_URI ? 'Connected' : 'Not configured');
-      console.log('JWT Secret:', process.env.JWT_SECRET ? 'Set' : 'Not set');
-    });
-  } catch (error) {
-    console.error('Error connecting to MongoDB:', error.message);
+    // Only start the server if not in Vercel environment
+    if (process.env.VERCEL !== '1') {
+      const server = app.listen(PORT || 5000, () => {
+        console.log(`Server running on port ${PORT || 5000}`);
+      });
+    }
+  } catch (err) {
+    console.error('Server Error:', err.message);
     process.exit(1);
   }
 };
@@ -118,7 +118,9 @@ process.on('unhandledRejection', (err) => {
   // server.close(() => process.exit(1));
 });
 
-startServer();
+// Start the server if not in Vercel environment
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
 
 module.exports = app;
-

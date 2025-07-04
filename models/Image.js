@@ -39,6 +39,11 @@ const imageSchema = new mongoose.Schema({
     type: String,
     default: 'stable-diffusion-xl-1024-v1-0'
   },
+  downloaded: {
+    type: Boolean,
+    default: false,
+    required: true
+  },
   stylePreset: {
     type: String,
     enum: [
