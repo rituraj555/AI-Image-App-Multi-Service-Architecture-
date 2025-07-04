@@ -11,7 +11,7 @@ const { RateLimiter } = require('limiter');
 
 // Configure rate limiter for Stability AI API (3 requests per second)
 const stabilityLimiter = new RateLimiter({
-  tokensPerInterval: 3,
+  tokensPerInterval: 30,
   interval: 'second',
   fireImmediately: false
 });
