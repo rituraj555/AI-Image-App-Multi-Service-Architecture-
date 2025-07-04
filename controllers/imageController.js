@@ -8,9 +8,21 @@ const { transformBufferObjects } = require('../utils/transformResponse');
 const Image = require('../models/Image');
 const User = require('../models/User');
 
+// Constants
+const STABILITY_API_KEY = process.env.STABILITY_API_KEY;
+const COST_PER_IMAGE_SD15 = parseInt(process.env.COST_PER_IMAGE_SD15) || 5; // Reduced cost for SD 1.5
+const COST_PER_IMAGE_SD16 = parseInt(process.env.COST_PER_IMAGE_SD16) || 10; // Cost for SD 1.6
+const STABILITY_API_URL_SD15 = 'https://api.stability.ai/v1/generation/stable-diffusion-v1-5/text-to-image';
+const STABILITY_API_URL_SD16 = 'https://api.stability.ai/v1/generation/stable-diffusion-v1-6/text-to-image';
+const MIN_DIMENSION = 320;
+const MAX_DIMENSION = 1536;
+const DIMENSION_STEP = 64;
+
+// Cost per image generation in coins
+const COST_PER_IMAGE = process.env.COST_PER_IMAGE ? parseInt(process.env.COST_PER_IMAGE, 10) : 10; // Load from .env or use defaults
+
 // Configuration from environment variables
-const COST_PER_IMAGE = parseInt(process.env.COST_PER_IMAGE) || 5; // Reduced cost for SD 1.5
-const DEFAULT_MODEL = 'stable-diffusion-v1-5';
+const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'stable-diffusion-v1-5';
 const STABILITY_API_BASE_URL = process.env.STABILITY_API_URL?.split('/v1/')[0] || 'https://api.stability.ai';
 const STABILITY_API_URL = `${STABILITY_API_BASE_URL}/v1/generation/${DEFAULT_MODEL}/text-to-image`;
 const STABILITY_API_KEY_VALIDATION_URL = `${STABILITY_API_BASE_URL}/v1/user/account`;
@@ -48,15 +60,34 @@ async function validateStabilityApiKey(apiKey) {
   }
 }
 
-// @desc    Generate AI image
-// @route   POST /api/image/generate
-// @access  Private
+/**
+ * @desc    Generate AI image using Stable Diffusion v1.6
+ * @route   POST /api/image/generate
+ * @access  Private
+ * @param   {Object} req - Express request object
+ * @param   {Object} res - Express response object
+ * @param   {Function} next - Express next middleware function
+ * @returns {Object} JSON response with generated image data
+ */
 exports.generateImage = async (req, res, next) => {
   const session = await Image.startSession();
   session.startTransaction();
 
   try {
-    const { prompt, stylePreset, negativePrompt, width, height, samples, cfgScale, steps, seed } = req.body;
+    const { 
+      prompt, 
+      stylePreset, 
+      negativePrompt, 
+      width = 512, 
+      height = 512, 
+      samples = 1, 
+      cfg_scale = 7, 
+      steps = 30, 
+      seed,
+      clip_guidance_preset,
+      sampler
+    } = req.body;
+    
     const userId = req.user.id;
 
     // Validate required fields
@@ -64,36 +95,49 @@ exports.generateImage = async (req, res, next) => {
       return next(new ErrorResponse('Prompt is required', 400));
     }
 
-    // Get user's API key from headers
-    const apiKey = req.headers['x-stability-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
-    
-    if (!apiKey) {
-      return next(new ErrorResponse('Stability AI API key is required. Please provide it in the x-stability-api-key header.', 400));
+    // Check if API key is configured
+    if (!STABILITY_API_KEY) {
+      return next(new ErrorResponse('Stability AI API key is not configured', 500));
     }
 
-    // Validate API key format
-    if (!apiKey.startsWith(API_KEY_PREFIX) || apiKey.length < MIN_API_KEY_LENGTH) {
-      return next(new ErrorResponse('Invalid API key format', 400));
-    }
-
-    // Check user's coin balance
-    const user = await User.findById(userId).session(session);
-    if (user.coins < COST_PER_IMAGE) {
-      return next(new ErrorResponse('Insufficient coins', 400));
-    }
-    
-    // Validate dimensions for SD 1.5
+    // Validate dimensions
     const imgWidth = parseInt(width);
     const imgHeight = parseInt(height);
     
-    if (!VALID_DIMENSIONS.includes(imgWidth) || !VALID_DIMENSIONS.includes(imgHeight)) {
+    if (isNaN(imgWidth) || isNaN(imgHeight)) {
+      return next(new ErrorResponse('Width and height must be valid numbers', 400));
+    }
+    
+    if (imgWidth < MIN_DIMENSION || imgWidth > MAX_DIMENSION || 
+        imgHeight < MIN_DIMENSION || imgHeight > MAX_DIMENSION) {
       return next(new ErrorResponse(
-        `SD 1.5 only supports the following dimensions: ${VALID_DIMENSIONS.join('x')}`, 
+        `Dimensions must be between ${MIN_DIMENSION} and ${MAX_DIMENSION} pixels`,
+        400
+      ));
+    }
+    
+    if (imgWidth % DIMENSION_STEP !== 0 || imgHeight % DIMENSION_STEP !== 0) {
+      return next(new ErrorResponse(
+        `Dimensions must be multiples of ${DIMENSION_STEP} pixels`,
         400
       ));
     }
 
-    // Prepare the request payload for SD 1.5
+    // Check user's coin balance
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      return next(new ErrorResponse('User not found', 404));
+    }
+    
+    const totalCost = COST_PER_IMAGE * Math.min(parseInt(samples) || 1, 10);
+    if (user.coins < totalCost) {
+      return next(new ErrorResponse(
+        `Insufficient coins. Required: ${totalCost}, Available: ${user.coins}`,
+        400
+      ));
+    }
+
+    // Prepare the request payload for SD v1.6
     const payload = {
       text_prompts: [
         {
@@ -101,88 +145,83 @@ exports.generateImage = async (req, res, next) => {
           weight: 1.0
         }
       ],
-      cfg_scale: Math.min(Math.max(parseFloat(cfgScale) || 7, 1), 35), // Clamp 1-35
+      cfg_scale: Math.min(Math.max(parseFloat(cfg_scale), 0), 35) || 7,
       height: imgHeight,
       width: imgWidth,
-      samples: Math.min(parseInt(samples) || 1, 4), // Max 4 samples per request
-      steps: Math.min(Math.max(parseInt(steps) || 30, 10), 50), // Clamp 10-50 steps
-      seed: seed || Math.floor(Math.random() * 4294967295) // Full 32-bit range
+      samples: Math.min(parseInt(samples), 10) || 1,
+      steps: Math.min(Math.max(parseInt(steps), 10), 50) || 30,
+      seed: seed || Math.floor(Math.random() * 4294967295) // 32-bit integer
     };
 
-    // SD 1.5 handles negative prompts differently
-    const fullPrompt = negativePrompt && negativePrompt.trim() !== ''
-      ? `${prompt} ### ${negativePrompt}`
-      : prompt;
-      
-    payload.text_prompts[0].text = fullPrompt.trim();
+    // Add negative prompt if provided
     if (negativePrompt && negativePrompt.trim() !== '') {
       payload.text_prompts.push({
         text: negativePrompt.trim(),
         weight: -1.0
       });
     }
+    
+    // Add optional parameters if provided
+    if (stylePreset) payload.style_preset = stylePreset;
+    if (clip_guidance_preset) payload.clip_guidance_preset = clip_guidance_preset;
+    if (sampler) payload.sampler = sampler;
 
     // Call Stability AI API
     console.log('Calling Stability AI API with payload:', JSON.stringify(payload, null, 2));
-    console.log('API URL:', STABILITY_API_URL);
     
     const response = await axios.post(
-      STABILITY_API_URL,
+      STABILITY_API_URL_SD16,
       payload,
       {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Accept-Version': '2023-08-16-preview',
-          'Authorization': `Bearer ${apiKey}`
+          'Authorization': `Bearer ${STABILITY_API_KEY}`
         },
         responseType: 'json',
-        timeout: parseInt(process.env.STABILITY_API_TIMEOUT) || 30000
+        timeout: parseInt(process.env.STABILITY_API_TIMEOUT) || 60000 // 60 seconds timeout
       }
     ).catch(error => {
-      console.error('Stability AI API Error:', {
+      const errorInfo = {
         message: error.message,
-        response: error.response ? {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data
-        } : 'No response',
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
         config: {
           url: error.config?.url,
           method: error.config?.method,
-          headers: error.config?.headers ? {
-            ...error.config.headers,
-            'Authorization': '[REDACTED]' // Don't log the actual API key
-          } : 'No headers',
           data: error.config?.data
         }
-      });
-      throw error;
+      };
+      
+      console.error('Stability AI API Error:', JSON.stringify(errorInfo, null, 2));
+      
+      // Handle rate limiting
+      if (error.response?.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      }
+      
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        throw new Error('Invalid API key. Please check your configuration.');
+      }
+      
+      throw new Error(error.response?.data?.message || 'Failed to generate image');
     });
     
-    console.log('Stability AI API Response Status:', response.status);
-    console.log('Response data keys:', Object.keys(response.data));
-    console.log('Response data.artifacts exists:', !!response.data.artifacts);
-    if (response.data.artifacts) {
-      console.log('Artifacts array length:', response.data.artifacts.length);
-      if (response.data.artifacts.length > 0) {
-        console.log('First artifact keys:', Object.keys(response.data.artifacts[0]));
-      }
-    }
-
-    if (!response.data.artifacts || !response.data.artifacts.length) {
+    if (!response.data.artifacts?.length) {
       console.error('No artifacts in response:', JSON.stringify(response.data, null, 2));
       throw new Error('No image was generated by the AI service');
     }
     
-    // Check if any of the artifacts have an error
+    // Check for errors in artifacts
     const errorArtifact = response.data.artifacts.find(art => art.type === 'error');
     if (errorArtifact) {
       throw new Error(`AI service error: ${errorArtifact.message || 'Unknown error'}`);
     }
 
     // Deduct coins from user
-    user.coins -= COST_PER_IMAGE;
+    user.coins -= totalCost;
     await user.save({ session });
 
     // Process the generated images
@@ -190,207 +229,384 @@ exports.generateImage = async (req, res, next) => {
     
     for (const artifact of response.data.artifacts) {
       const imageId = uuidv4();
+      let imageUrl = null;
       
-      // Save image to storage
-      let imageUrl;
       try {
-        imageUrl = await saveImageToStorage(artifact.base64, imageId);
+        // Only save to storage temporarily if we have base64 data
+        if (artifact.base64) {
+          imageUrl = await saveImageToStorage(artifact.base64, imageId);
+        }
       } catch (storageError) {
         console.error('Failed to save image to storage:', storageError);
-        // Continue with the response even if storage fails, as we still have the base64 data
-        imageUrl = null;
+        // Continue with the response even if storage fails
       }
       
       // Create image record in database
       const newImage = new Image({
         userId,
         prompt,
-        imageUrl,  // Still store the URL if you want to keep track of it
+        imageUrl,
         imageId,
-        coinsUsed: COST_PER_IMAGE,
+        coinsUsed: COST_PER_IMAGE_SD16,
         size: {
-          width: width || 1024,
-          height: height || 1024
+          width: imgWidth,
+          height: imgHeight
         },
-        model: 'stable-diffusion-xl-1024-v1-0',
-        stylePreset: stylePreset || 'digital-art',
-        negativePrompt: negativePrompt || '',
-        cfgScale: cfgScale || 7,
-        steps: steps || 30,
-        seed: seed || 0,
-        samples: samples || 1
+        model: 'stable-diffusion-v1-6',
+        stylePreset: stylePreset || null,
+        negativePrompt: negativePrompt || null,
+        cfgScale: parseFloat(cfg_scale) || 7,
+        steps: parseInt(steps) || 30,
+        seed: seed || null,
+        samples: parseInt(samples) || 1
       });
 
       await newImage.save({ session });
       
-      // Include base64 data in the response
-      imageArtifacts.push({
+      // Prepare response data
+      const imageData = {
         id: newImage._id,
-        imageData: `data:image/png;base64,${artifact.base64}`, // Base64 data URL
-        imageUrl: imageUrl, // Still include URL if needed
+        imageId: newImage.imageId,
         prompt: newImage.prompt,
-        createdAt: newImage.createdAt
-      });
+        imageUrl: newImage.imageUrl,
+        size: newImage.size,
+        model: newImage.model,
+        stylePreset: newImage.stylePreset,
+        negativePrompt: newImage.negativePrompt,
+        cfgScale: newImage.cfgScale,
+        steps: newImage.steps,
+        seed: newImage.seed,
+        samples: newImage.samples,
+        coinsUsed: COST_PER_IMAGE_SD16,
+        createdAt: newImage.createdAt,
+        // Include base64 data in the response if available
+        ...(artifact.base64 && { imageData: `data:image/png;base64,${artifact.base64}` })
+      };
+      
+      imageArtifacts.push(imageData);
     }
 
+    // Commit the transaction
     await session.commitTransaction();
     session.endSession();
 
-    // Prepare the response
+    // Prepare the response with base64 data
     const responseData = {
       success: true,
       data: {
         images: imageArtifacts,
-        coinsUsed: COST_PER_IMAGE * imageArtifacts.length,
-        remainingCoins: user.coins
+        coinsUsed: totalCost,
+        remainingCoins: user.coins - totalCost
       }
     };
 
-    // Transform buffer objects in the response
-    const transformedResponse = transformBufferObjects(responseData);
+    // Transform buffer objects in the response if needed
+    const transformedResponse = transformBufferObjects ? 
+      transformBufferObjects(responseData) : responseData;
 
+    // Send the response with base64 data
     res.status(201).json(transformedResponse);
+    
+    // After sending the response, delete the images from storage
+    try {
+      for (const image of imageArtifacts) {
+        if (image.imageId) {
+          await deleteImageFromStorage(image.imageId);
+        }
+      }
+    } catch (deleteError) {
+      console.error('Error deleting images after sending:', deleteError);
+      // Continue even if deletion fails
+    }
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    await session.abortTransaction().catch(console.error);
+    session.endSession().catch(console.error);
     
     console.error('Image generation error:', {
       message: error.message,
-      stack: error.stack,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack,
       name: error.name,
       code: error.code,
-      response: error.response?.data,
-      status: error.response?.status,
-      config: error.config ? {
-        url: error.config.url,
-        method: error.config.method,
-        headers: error.config.headers ? {
-          ...error.config.headers,
-          'Authorization': error.config.headers.Authorization ? '[REDACTED]' : undefined
-        } : {},
-        data: error.config.data
-      } : {}
+      status: error.response?.status
     });
     
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to generate image';
-    next(new ErrorResponse(`Image generation failed: ${errorMessage}`, error.response?.status || 500));
+    next(new ErrorResponse(
+      error.message || 'Failed to generate image',
+      error.statusCode || error.response?.status || 500
+    ));
   }
 };
 
-// @desc    Get user's image generation history
-// @route   GET /api/image/history
-// @access  Private
+/**
+ * @desc    Get user's image generation history
+ * @route   GET /api/image/history
+ * @access  Private
+ * @param   {Object} req - Express request object
+ * @param   {Object} res - Express response object
+ * @param   {Function} next - Express next middleware function
+ * @returns {Object} JSON response with paginated image history
+ */
 exports.getImageHistory = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const { page = 1, limit = 10, model, startDate, endDate } = req.query;
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(Math.max(parseInt(limit), 1), 50); // Max 50 items per page
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query = { userId: req.user.id };
+    
+    // Add model filter if provided
+    if (model) {
+      query.model = model;
+    }
+    
+    // Add date range filter if provided
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate);
+      }
+    }
 
     const [images, total] = await Promise.all([
-      Image.find({ userId: req.user.id })
+      Image.find(query)
+        .select('-__v -updatedAt')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit)),
-      Image.countDocuments({ userId: req.user.id })
+        .limit(limitNum)
+        .lean(),
+      Image.countDocuments(query)
     ]);
+
+    // Sanitize and format the response
+    const sanitizedImages = images.map(image => ({
+      id: image._id,
+      imageId: image.imageId,
+      prompt: image.prompt,
+      imageUrl: image.imageUrl,
+      size: image.size,
+      model: image.model,
+      stylePreset: image.stylePreset,
+      negativePrompt: image.negativePrompt,
+      cfgScale: image.cfgScale,
+      steps: image.steps,
+      seed: image.seed,
+      samples: image.samples,
+      coinsUsed: image.coinsUsed,
+      createdAt: image.createdAt
+    }));
 
     res.status(200).json({
       success: true,
-      count: images.length,
+      count: sanitizedImages.length,
       total,
-      page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      data: images
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
+      data: sanitizedImages
     });
   } catch (error) {
-    next(error);
+    console.error('Error fetching image history:', error);
+    next(new ErrorResponse('Failed to fetch image history', 500));
   }
 };
 
-// @desc    Get a single generated image
-// @route   GET /api/image/:id
-// @access  Private
+/**
+ * @desc    Get a single generated image by ID
+ * @route   GET /api/image/:id
+ * @access  Private
+ * @param   {Object} req - Express request object
+ * @param   {Object} res - Express response object
+ * @param   {Function} next - Express next middleware function
+ * @returns {Object} JSON response with the requested image
+ */
 exports.getImage = async (req, res, next) => {
   try {
     const image = await Image.findOne({
       _id: req.params.id,
       userId: req.user.id
-    });
+    }).select('-__v -updatedAt').lean();
 
     if (!image) {
       return next(new ErrorResponse('Image not found', 404));
     }
 
+    // Sanitize the response
+    const sanitizedImage = {
+      id: image._id,
+      imageId: image.imageId,
+      prompt: image.prompt,
+      imageUrl: image.imageUrl,
+      size: image.size,
+      model: image.model,
+      stylePreset: image.stylePreset,
+      negativePrompt: image.negativePrompt,
+      cfgScale: image.cfgScale,
+      steps: image.steps,
+      seed: image.seed,
+      samples: image.samples,
+      coinsUsed: image.coinsUsed,
+      createdAt: image.createdAt
+    };
+
     res.status(200).json({
       success: true,
-      data: image
+      data: sanitizedImage
     });
   } catch (error) {
-    next(error);
+    console.error(`Error fetching image ${req.params.id}:`, error);
+    
+    if (error.name === 'CastError') {
+      return next(new ErrorResponse('Invalid image ID', 400));
+    }
+    
+    next(new ErrorResponse('Failed to fetch image', 500));
   }
 };
 
-// @desc    Delete a generated image
-// @route   DELETE /api/image/:id
-// @access  Private
+/**
+ * @desc    Delete a generated image
+ * @route   DELETE /api/image/:id
+ * @access  Private
+ * @param   {Object} req - Express request object
+ * @param   {Object} res - Express response object
+ * @param   {Function} next - Express next middleware function
+ * @returns {Object} JSON response indicating success or failure
+ */
 exports.deleteImage = async (req, res, next) => {
-  try {
-    const image = await Image.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id
-    });
-
-    if (!image) {
-      return next(new ErrorResponse('Image not found', 404));
-    }
-
-    // Delete the image file from storage
-    await deleteImageFromStorage(image.imageId);
-
-    res.status(200).json({
-      success: true,
-      data: {}
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Helper function to save image to storage (example implementation)
-async function saveImageToStorage(base64Data, imageId) {
-  // In a production environment, you would upload to a cloud storage service like AWS S3, Google Cloud Storage, etc.
-  // This is a simplified example that saves to the local filesystem
+  const session = await Image.startSession();
+  session.startTransaction();
   
   try {
-    const uploadDir = path.join(__dirname, '../../public/uploads');
-    
-    // Create uploads directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    // Find the image first to get the imageId
+    const image = await Image.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    }).session(session);
+
+    if (!image) {
+      await session.abortTransaction();
+      session.endSession();
+      return next(new ErrorResponse('Image not found', 404));
     }
     
-    const filePath = path.join(uploadDir, `${imageId}.png`);
-    const buffer = Buffer.from(base64Data, 'base64');
+    const imageId = image.imageId;
     
+    // Delete the image record from the database
+    await Image.deleteOne({ _id: req.params.id }).session(session);
+    
+    // Delete the image file from storage
+    try {
+      await deleteImageFromStorage(imageId);
+    } catch (storageError) {
+      console.error('Failed to delete image file:', storageError);
+      // Continue with the deletion even if file deletion fails
+    }
+    
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      success: true,
+      data: { id: req.params.id, deleted: true }
+    });
+  } catch (error) {
+    await session.abortTransaction().catch(console.error);
+    session.endSession().catch(console.error);
+    
+    console.error(`Error deleting image ${req.params.id}:`, error);
+    
+    if (error.name === 'CastError') {
+      return next(new ErrorResponse('Invalid image ID', 400));
+    }
+    
+    next(new ErrorResponse('Failed to delete image', 500));
+  }
+};
+
+/**
+ * Saves an image to the storage system
+ * @param {string} base64Data - The base64 encoded image data
+ * @param {string} imageId - Unique identifier for the image
+ * @returns {Promise<string>} The URL or path to the saved image
+ * @throws {Error} If the image cannot be saved
+ */
+async function saveImageToStorage(base64Data, imageId) {
+  if (!base64Data) {
+    throw new Error('No image data provided');
+  }
+
+  // In a production environment, you would upload to a cloud storage service
+  // like AWS S3, Google Cloud Storage, Cloudinary, etc.
+  // This is a simplified example that saves to the local filesystem
+  
+  // Ensure the uploads directory exists
+  const uploadDir = path.join(__dirname, '../../public/uploads');
+  
+  try {
+    // Create the directory if it doesn't exist (recursively)
+    await fs.promises.mkdir(uploadDir, { recursive: true });
+    
+    // Create the full file path
+    const fileName = `${imageId}.png`;
+    const filePath = path.join(uploadDir, fileName);
+    
+    // Convert base64 to buffer and write to file
+    const buffer = Buffer.from(base64Data, 'base64');
     await fs.promises.writeFile(filePath, buffer);
     
-    // In a real app, return the public URL of the uploaded file
-    return `/uploads/${imageId}.png`;
+    // Return the relative URL path
+    return `/uploads/${fileName}`;
   } catch (error) {
-    console.error('Error saving image:', error);
-    throw new Error('Failed to save image');
+    console.error('Error saving image to storage:', error);
+    throw new Error(`Failed to save image: ${error.message}`);
   }
 }
 
-// Helper function to delete image from storage
+/**
+ * Deletes an image from the storage system
+ * @param {string} imageId - The unique identifier of the image to delete
+ * @returns {Promise<void>}
+ * @throws {Error} If the image cannot be deleted
+ */
 async function deleteImageFromStorage(imageId) {
+  if (!imageId) {
+    throw new Error('No image ID provided');
+  }
+
   try {
     const filePath = path.join(__dirname, '../../public/uploads', `${imageId}.png`);
     
-    if (fs.existsSync(filePath)) {
+    // Check if file exists before attempting to delete
+    try {
+      await fs.promises.access(filePath, fs.constants.F_OK);
+      
+      // File exists, so delete it
       await fs.promises.unlink(filePath);
+      
+      // Optional: Delete the directory if it's empty
+      const dirPath = path.dirname(filePath);
+      try {
+        const files = await fs.promises.readdir(dirPath);
+        if (files.length === 0) {
+          await fs.promises.rmdir(dirPath);
+        }
+      } catch (dirError) {
+        // It's okay if we can't delete the directory
+        console.debug('Could not remove directory (may not be empty):', dirError.message);
+      }
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        // File doesn't exist, which is fine for a delete operation
+        return;
+      }
+      throw error; // Re-throw other errors
     }
   } catch (error) {
-    console.error('Error deleting image:', error);
-    throw new Error('Failed to delete image');
+    console.error(`Error deleting image ${imageId}:`, error);
+    throw new Error(`Failed to delete image: ${error.message}`);
   }
 }
