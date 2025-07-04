@@ -1,515 +1,25 @@
 <div align="center">
   <h1>🎨 AI Image Generation Backend</h1>
-  <p>Scalable backend for AI-powered image generation with coin-based access control</p>
+  <p>Scalable microservices backend for AI-powered image generation with coin and subscription models</p>
   
   [![Node.js](https://img.shields.io/badge/Node.js-18.x-339933?logo=nodedotjs)](https://nodejs.org/)
   [![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express)](https://expressjs.com/)
   [![MongoDB](https://img.shields.io/badge/MongoDB-5.0-47A248?logo=mongodb)](https://www.mongodb.com/)
-  [![Swagger](https://img.shields.io/badge/Swagger-85EA2D?logo=swagger&logoColor=white)](https://swagger.io/)
+  [![AWS Elastic Beanstalk](https://img.shields.io/badge/AWS-Elastic%20Beanstalk-FF9900?logo=amazonaws)](https://aws.amazon.com/elasticbeanstalk/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
 ## 📄 Description
 
-A robust, scalable backend system for an AI-powered image generation application. This project provides a RESTful API for generating AI images using **Stability AI's Stable Diffusion XL 1.0 model**, with built-in user authentication, coin-based access control, and comprehensive API documentation.
-
-## 🚀 Features
-
-### 🖼️ AI Image Generation
-- **Multiple AI Models**:
-  - **Stable Diffusion v1.5** - Fast and cost-effective image generation (1 credit per image)
-  - **Stable Diffusion XL 1.0** - High-quality, high-resolution image generation
-- **Multiple Styles**: Support for various artistic styles (e.g., `realistic`, `cartoon`, `anime`).
-- **Customizable Parameters**: Control over CFG scale, steps, seed, and dimensions.
-- **Supported Dimensions**:
-  - **SD v1.5**:
-    - Default: `512x512`
-    - Other square dimensions supported (up to 1024x1024)
-  - **SDXL 1.0**:
-    - `1024x1024` (Default)
-    - `1152x896`
-    - `1216x832`
-    - `1344x768`
-    - `1536x640`
-    - `640x1536`
-    - `768x1344`
-    - `832x1216`
-    - `896x1152`
-- **Negative Prompts**: Fine-tune image generation with negative prompts.
-- **Cost-Effective**: Choose between different models based on quality and cost requirements.
-
-### 🔐 Authentication & Security
-- **JWT-based Authentication** with secure token handling.
-- **Role-based Access Control** (User, Admin).
-- **Rate Limiting** on sensitive endpoints to prevent abuse.
-- **Input Validation** for all API endpoints.
-- **Secure API Key Storage**: User-provided Stability AI keys are encrypted before being stored.
-- **API Key Validation**: Automatically validates Stability AI keys before use.
-
-### 💰 Coin System
-- **Earn Coins**: Users can earn coins through in-app actions (e.g., watching ads).
-- **Purchase Coins**: In-app purchases for coin bundles.
-- **Cost-Based Access**: Image generation deducts a fixed number of coins.
-- **Transaction History**: Users can view their complete coin transaction history.
-
-### 📚 API Documentation
-- **Interactive Swagger UI** available at `/api-docs`.
-- **OpenAPI 3.0** specification for clear, standardized documentation.
-- **Live Testing**: Test API endpoints directly from the browser.
-
-## 🔧 Setup & Installation
-
-### Prerequisites
-- Node.js 18.x or later
-- MongoDB 5.0 or later
-- Stability AI API key (required for image generation)
-  - Get your API key from [Stability AI Platform](https://platform.stability.ai/)
-
-### Installation
-
-1.  **Clone the repository**
-    ```bash
-    git clone https://github.com/yourusername/ai-image-generator-backend.git
-    cd ai-image-generator-backend
-    ```
-
-2.  **Install dependencies**
-    ```bash
-    npm install
-    ```
-
-3.  **Configure environment variables**
-    Create a `.env` file by copying the example and fill in your configuration details.
-    ```bash
-    cp .env.example .env
-    ```
-    > **Note**: Edit `.env` with your `MONGO_URI`, `JWT_SECRET`, `STABILITY_API_KEY`, and other required values.
-
-4.  **Start the development server**
-    ```bash
-    npm run dev
-    ```
-
-5.  **Access the API documentation**
-    - Open `http://localhost:8000/api-docs` in your browser (the port may vary based on your `.env` config).
-
-## 🧪 Testing
-
-This project uses Jest for automated testing. Tests run against an in-memory MongoDB server to avoid interfering with your development database.
-
-### Test the Image Generation Endpoint
-
-```bash
-curl -X POST http://localhost:5000/api/image/generate \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "prompt": "a cyberpunk warrior in anime style",
-    "negativePrompt": "blurry, low quality",
-    "steps": 30,
-    "cfg_scale": 7,
-    "width": 512,
-    "height": 512,
-    "samples": 1
-  }'
-```
-
-### Running Tests
-- **Run all tests:**
-  ```bash
-  npm test
-  ```
-- **Run tests in watch mode:**
-  ```bash
-  npm run test:watch
-  ```
-
-## 📚 API Endpoints
-
-### 🔐 Authentication
-
-#### Register a New User
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "securePassword123"
-}
-
-# Response (201 Created)
-{
-  "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-#### User Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "john@example.com",
-  "password": "securePassword123"
-}
-
-# Response (200 OK)
-{
-  "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-### 🔑 API Key Management
-
-#### Save/Update API Key
-```http
-POST /api/apikey/save
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "apiKey": "sk-your-stability-ai-api-key"
-}
-
-# Response (200 OK)
-{
-  "success": true,
-  "message": "API key saved successfully"
-}
-```
-
-### 🖼️ Image Generation
-
-#### Generate AI Image
-```http
-POST /api/image/generate
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "prompt": "a cyberpunk city at night, neon lights, rain, 4k",
-  "negativePrompt": "blurry, low quality, text, watermark",
-  "width": 512,
-  "height": 512,
-  "steps": 30,
-  "cfg_scale": 7,
-  "samples": 1
-}
-
-# Response (200 OK)
-{
-  "success": true,
-  "data": {
-    "images": [{
-      "id": "60d5ec9cf4b3f10015e8a7b2",
-      "imageData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNTCA...",
-      "prompt": "a cyberpunk city at night, neon lights, rain, 4k",
-      "createdAt": "2023-06-28T10:30:00.000Z"
-    }],
-    "coinsUsed": 10,
-    "remainingCoins": 90
-  }
-}
-```
-
-### 💰 Coin Management
-
-#### Earn Coins
-```http
-POST /api/coin/earn
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "amount": 10,
-  "source": "ad_watch"
-}
-
-# Response (200 OK)
-{
-  "success": true,
-  "data": {
-    "balance": 100,
-    "transaction": {
-      "type": "earn",
-      "amount": 10,
-      "source": "ad_watch",
-      "balanceAfter": 100,
-      "timestamp": "2023-06-28T10:30:00.000Z"
-    }
-  }
-}
-```
-
-### 🔄 Subscription
-
-#### Verify Subscription
-```http
-POST /api/subscription/verify
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "subscriptionId": "com.example.subscription.premium",
-  "purchaseToken": "purchase_token_here",
-  "packageName": "com.example.app"
-}
-
-# Response (200 OK)
-{
-  "success": true,
-  "data": {
-    "subscriptionActive": true,
-    "expiryDate": "2023-12-31T23:59:59.000Z"
-  }
-}
-```
-
-### 👤 User Profile
-
-#### Get User Profile
-```http
-GET /api/user/profile
-Authorization: Bearer <token>
-
-# Response (200 OK)
-{
-  "success": true,
-  "data": {
-    "id": "60d5ec9cf4b3f10015e8a7b1",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "coins": 100,
-    "subscription": {
-      "active": true,
-      "plan": "premium",
-      "expiresAt": "2023-12-31T23:59:59.000Z"
-    },
-    "createdAt": "2023-01-15T10:30:00.000Z"
-  }
-}
-```
-
-### 🔐 Authentication
-
-| Method | Endpoint | Description | Authentication Required |
-|--------|----------|-------------|--------------------------|
-| `POST` | `/api/auth/register` | Register a new user | No |
-| `POST` | `/api/auth/login` | Login user and get JWT token | No |
-| `GET` | `/api/auth/me` | Get current user's profile | Yes |
-
-### 🔑 API Key Management
-
-| Method | Endpoint | Description | Authentication Required |
-|--------|----------|-------------|--------------------------|
-| `POST` | `/api/apikey/save` | Save or update Stability AI API key | Yes |
-| `GET` | `/api/apikey` | Get user's API key (encrypted) | Yes |
-| `DELETE` | `/api/apikey` | Delete user's API key | Yes |
-
-### 🖼️ Image Generation
-
-| Method | Endpoint | Description | Authentication Required |
-|--------|----------|-------------|--------------------------|
-| `POST` | `/api/image/generate` | Generate AI image | Yes |
-| `GET` | `/api/image/history` | Get user's image generation history | Yes |
-| `GET` | `/api/image/:id` | Get a specific generated image | Yes |
-| `DELETE` | `/api/image/:id` | Delete a generated image | Yes |
-
-### 💰 Coin Management
-
-| Method | Endpoint | Description | Authentication Required |
-|--------|----------|-------------|--------------------------|
-| `POST` | `/api/coin/earn` | Earn coins (e.g., watching ads) | Yes |
-| `POST` | `/api/coin/buy` | Purchase coins | Yes |
-| `GET` | `/api/coin/balance` | Get user's coin balance | Yes |
-| `GET` | `/api/coin/transactions` | Get transaction history | Yes |
-
-### 🔄 Subscription
-
-| Method | Endpoint | Description | Authentication Required |
-|--------|----------|-------------|--------------------------|
-| `POST` | `/api/subscription/verify` | Verify Google Play subscription | Yes |
-| `GET` | `/api/subscription/status` | Get subscription status | Yes |
-
-### 👤 User Profile
-
-| Method | Endpoint | Description | Authentication Required |
-|--------|----------|-------------|--------------------------|
-| `GET` | `/api/user/profile` | Get user profile | Yes |
-| `PUT` | `/api/user/profile` | Update user profile | Yes |
-| `DELETE` | `/api/user` | Delete user account | Yes |
-
-All endpoints are prefixed with `/api`. Authentication is required for all routes except for `POST /auth/register` and `POST /auth/login`.
-
-| Method | Endpoint                    | Description                               |
-|--------|-----------------------------|-------------------------------------------|
-| `POST` | `/auth/register`            | Register a new user.                      |
-| `POST` | `/auth/login`               | Login and receive a JWT token.            |
-| `GET`  | `/auth/me`                  | Get the current authenticated user's profile. |
-| `POST` | `/image/generate`           | Generate a new AI image.                  |
-| `GET`  | `/image/history`            | Get the user's image generation history.  |
-| `POST` | `/coin/earn`                | Earn coins (e.g., after watching an ad).  |
-| `POST` | `/coin/buy`                 | Record a coin purchase.                   |
-| `GET`  | `/coin/history`             | Get the user's coin transaction history.  |
-| `GET`  | `/coin/balance`             | Get the user's current coin balance.      |
-| `POST` | `/api-key`                  | Save or update a user's Stability AI API key. |
-| `GET`  | `/api-key`                  | Retrieve the user's saved API key (encrypted). |
-| `DELETE`| `/api-key`                  | Delete the user's saved API key.          |
-| `POST` | `/subscription/verify`      | Verify a Google Play Store subscription.  |
-
-> For detailed request/response schemas and to try out the endpoints, please visit the **[Swagger UI Documentation](#-api-documentation)**.
-
-## 🏗️ Architecture
-
-The backend follows a modular, layered architecture to separate concerns and improve maintainability:
-
--   **`config`**: Database connection and environment variable management.
--   **`controllers`**: Business logic for handling requests.
--   **`docs`**: Swagger API documentation setup.
--   **`middleware`**: Request processing middleware (authentication, error handling, validation).
--   **`models`**: Mongoose schemas for database models.
--   **`routes`**: Express route definitions.
--   **`services`**: Logic for interacting with external services (e.g., Stability AI).
--   **`tests`**: Jest test suites for API endpoints.
--   **`utils`**: Helper functions and utilities.
-
-## 🚀 Deployment
-
-This application is ready for deployment on platforms like AWS Elastic Beanstalk, Heroku, or any service that supports Node.js.
-
-### Production Deployment Steps (Example: AWS)
-
-1.  **Set environment to production** in your `.env` file.
-2.  **Install AWS EB CLI**.
-3.  **Initialize Elastic Beanstalk**: `eb init -p "Node.js" --region your-region`
-4.  **Create an environment**: `eb create your-env-name`
-5.  **Set environment variables** in the Elastic Beanstalk console or via the CLI.
-6.  **Deploy**: `eb deploy`
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a pull request or open an issue for any bugs or feature requests.
-
-## 📜 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-- `GET /image/history` - Get user's image generation history
-- `GET /image/:id` - Get a specific generated image
-- `DELETE /image/:id` - Delete a generated image
-
-#### API Keys
-- `POST /apikey/save` - Save or update Stability AI API key
-- `GET /apikey/info` - Get API key info (does not expose the key)
-- `DELETE /apikey/remove` - Remove API key
-
-#### Coins
-- `POST /coin/add` - Add coins by watching an ad
-- `POST /coin/buy` - Purchase coins
-- `GET /coin/balance` - Get current coin balance
-- `GET /coin/transactions` - Get transaction history
-
-## 🛡️ Security
-
-### Rate Limiting
-- Authentication endpoints: 50 requests per 15 minutes
-- API key operations: 10 requests per hour
-- Image generation: 30 requests per 15 minutes
-- Coin operations: 20 requests per hour
-
-### Input Validation
-All user inputs are validated using `express-validator` to prevent injection attacks and ensure data integrity.
-
-### Data Protection
-- Passwords are hashed using bcrypt
-- API keys are encrypted before storage
-- Sensitive data is never logged
-
-## 📦 Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
-
-```env
-# Server
-NODE_ENV=development
-PORT=8000
-
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/ai_image_generator
-
-# JWT
-JWT_SECRET=your_jwt_secret
-JWT_EXPIRE=30d
-JWT_COOKIE_EXPIRE=30
-
-# Stability AI
-STABILITY_API_KEY=your_stability_ai_api_key
-STABILITY_API_HOST=api.stability.ai
-
-# File Upload
-MAX_FILE_UPLOAD=10 # MB
-FILE_UPLOAD_PATH=./public/uploads
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000 # 15 minutes
-RATE_LIMIT_MAX_REQUESTS=100
-
-# CORS
-CORS_ORIGIN=http://localhost:3000
-```
-
-## 🚀 Deployment
-
-### Production Deployment
-
-1. **Set environment to production**
-   ```bash
-   NODE_ENV=production
-   ```
-
-2. **Build the application**
-   ```bash
-   npm run build
-   ```
-
-3. **Start the production server**
-   ```bash
-   npm start
-   ```
-
-### Docker Deployment
-
-1. **Build the Docker image**
-   ```bash
-   docker build -t ai-image-generator .
-   ```
-
-2. **Run the container**
-   ```bash
-   docker run -d -p 8000:8000 --env-file .env ai-image-generator
-   ```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Stability AI](https://stability.ai/) for their amazing AI models
-- [Express.js](https://expressjs.com/) for the web framework
-- [MongoDB](https://www.mongodb.com/) for the database
-- [Swagger](https://swagger.io/) for API documentation
+A robust, scalable backend system for an AI-powered image generation application. This project follows a microservices architecture with separate services for authentication, user management, coin transactions, AI image generation, and subscription handling.
+
+## 🚀 Recent Updates
+
+### Image Generation Improvements
+- **Fixed**: Empty negative prompts are now properly handled
+- **Enhanced**: Better error messages for API failures
+- **Improved**: Request validation and sanitization
+- **Optimized**: Default values from environment variables for better configuration
 
 ### ✨ Key Features
 - 🔐 **Secure Authentication** with JWT
@@ -524,19 +34,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   - Image history and management
   - Rate limiting and request validation
 
-## 🔑 API Key Configuration
-
-### Stability AI API Key
-- **Automatically managed by the backend**
-- No need to provide an API key in requests
-- The backend uses its own Stability AI API key from environment variables
-- Server admin must ensure sufficient balance for image generation
-
-### Cost Estimates (for server admin)
-- 512x512 image (10 steps): ~$0.01 USD
-- 768x768 image (10 steps): ~$0.02 USD
-- 1024x1024 image (10 steps): ~$0.04 USD
-
 ## 🔧 Environment Variables
 
 This application uses environment variables for configuration. Here's a breakdown of the key variables:
@@ -545,27 +42,24 @@ This application uses environment variables for configuration. Here's a breakdow
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `NODE_ENV` | Application environment | `development`, `production` |
-| `STABILITY_API_KEY` | Your Stability AI API key | `sk-...` |
 | `PORT` | Port to run the server | `8000` |
 | `MONGO_URI` | MongoDB connection string | `mongodb+srv://...` |
 | `JWT_SECRET` | Secret for JWT token signing | `your_secure_secret` |
 | `JWT_EXPIRE` | JWT token expiration | `30d` |
-| `STABILITY_API_URL` | Base URL for Stability AI | `https://api.stability.ai` |
-| `COST_PER_IMAGE` | Coins deducted per image | `5` |
+| `STABILITY_API_KEY` | Stability AI API key | `sk-...` |
 | `GOOGLE_PLAY_PACKAGE_NAME` | Google Play package name | `com.yourapp.package` |
 
 ### Optional Variables
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEFAULT_IMAGE_WIDTH` | `512` | Default width for generated images (SD 1.5 supports 512 or 768) |
-| `DEFAULT_IMAGE_HEIGHT` | `512` | Default height for generated images (SD 1.5 supports 512 or 768) |
-| `DEFAULT_CFG_SCALE` | `7` | Default CFG scale for image generation (1-35) |
-| `DEFAULT_STEPS` | `30` | Default number of generation steps (10-50) |
-| `DEFAULT_SAMPLES` | `1` | Default number of images to generate (1-4) |
+| `DEFAULT_IMAGE_WIDTH` | `1024` | Default width for generated images |
+| `DEFAULT_IMAGE_HEIGHT` | `1024` | Default height for generated images |
+| `DEFAULT_CFG_SCALE` | `7` | Default CFG scale for image generation |
+| `DEFAULT_STEPS` | `50` | Default number of generation steps |
+| `DEFAULT_SAMPLES` | `1` | Default number of images to generate |
+| `DEFAULT_STYLE_PRESET` | `enhance` | Default style preset |
 | `RATE_LIMIT_WINDOW_MS` | `900000` (15 min) | Rate limiting window |
 | `RATE_LIMIT_MAX` | `100` | Max requests per window |
-| `UPLOAD_PATH` | `./public/uploads` | Local storage path for images |
-| `MAX_FILE_UPLOAD` | `10` | Maximum file upload size in MB |
 
 For a complete list of all available environment variables, see the [.env.example](.env.example) file.
 
@@ -703,62 +197,7 @@ Authorization: Bearer <your_jwt_token>
 
 **Endpoint:** `POST /api/image/generate`
 
-Generate AI images using text prompts with Stability AI's Stable Diffusion v1.5 model.
-
-**Headers:**
-- `Authorization: Bearer <JWT_TOKEN>` (required)
-- `Content-Type: application/json`
-
-**Request Body:**
-```json
-{
-  "prompt": "A beautiful sunset over mountains, digital art",
-  "negativePrompt": "blurry, low quality, distorted",
-  "width": 512,
-  "height": 512,
-  "samples": 1,
-  "steps": 30,
-  "cfgScale": 7,
-  "seed": 12345
-}
-```
-
-**Parameters:**
-- `prompt` (string, required): Text description of the image to generate
-- `negativePrompt` (string, optional): Text describing what to avoid in the image
-- `width` (number, optional): Width of the generated image (512 or 768)
-- `height` (number, optional): Height of the generated image (512 or 768)
-- `samples` (number, optional): Number of images to generate (1-4)
-- `steps` (number, optional): Number of diffusion steps (10-50)
-- `cfgScale` (number, optional): How strictly the diffusion process adheres to the prompt (1-35)
-- `seed` (number, optional): Random seed for reproducibility (0-4294967295)
-
-**Success Response (200 OK):**
-```json
-{
-  "success": true,
-  "data": {
-    "images": [
-      {
-        "id": "507f1f77bcf86cd799439011",
-        "imageData": "data:image/png;base64,...",
-        "imageUrl": "https://your-storage.com/images/12345.png",
-        "prompt": "A beautiful sunset over mountains, digital art",
-        "createdAt": "2023-04-01T12:00:00.000Z"
-      }
-    ],
-    "coinsUsed": 5,
-    "remainingCoins": 45
-  }
-}
-```
-
-**Error Responses:**
-- `400 Bad Request`: Missing or invalid parameters
-- `401 Unauthorized`: Invalid or missing API key
-- `402 Payment Required`: Insufficient credits
-- `429 Too Many Requests`: Rate limit exceeded
-- `500 Internal Server Error`: Server error
+Generate AI images using text prompts with Stability AI.
 
 **Headers:**
 ```
@@ -1154,7 +593,7 @@ const imageUrl = await uploadToS3(
 ### 🖼️ Image Generation Service
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
-| `POST` | `/api/image/generate` | Generate AI image (returns base64 data) | ✅ (uses server's API key) |
+| `POST` | `/api/image/generate` | Generate AI image (returns base64 data) | ✅ |
 | `GET` | `/api/image/history` | Get generation history | ✅ |
 | `GET` | `/api/image/:id` | Get specific image details | ✅ |
 | `DELETE` | `/api/image/:id` | Delete generated image | ✅ |
