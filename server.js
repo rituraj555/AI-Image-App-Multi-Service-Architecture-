@@ -118,8 +118,9 @@ process.on('unhandledRejection', (err) => {
   // server.close(() => process.exit(1));
 });
 
-startServer();
+// Start the server if not in Vercel environment
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
 
 module.exports = app;
-
-_
