@@ -19,6 +19,10 @@ const imageSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Image ID is required']
   },
+  cloudinaryPublicId: {
+    type: String,
+    required: [true, 'Cloudinary public ID is required']
+  },
   coinsUsed: {
     type: Number,
     required: true,
@@ -38,6 +42,17 @@ const imageSchema = new mongoose.Schema({
   model: {
     type: String,
     default: 'stable-diffusion-xl-1024-v1-0'
+  },
+  style: {
+    type: String,
+    enum: [
+      'realistic', 'anime', 'digital-art', 'comic', 'fantasy-art',
+      'line-art', 'analog-film', 'neon-punk', 'isometric', 'low-poly',
+      'origami', 'modeling-compound', 'cinematic', '3d-model', 'pixel-art',
+      'tile-texture', 'none'
+    ],
+    default: 'realistic',
+    required: true
   },
   downloaded: {
     type: Boolean,

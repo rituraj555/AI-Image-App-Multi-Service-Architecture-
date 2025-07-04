@@ -15,6 +15,12 @@ A robust, scalable backend system for an AI-powered image generation application
 
 ## 🚀 Recent Updates
 
+### Version 2.0.0 - Major Update: Style Selection & Cloudinary Integration
+- **✨ New Feature**: Added 16+ style presets for image generation including anime, digital art, pixel art, and more!
+- **☁️ Cloud Integration**: Now using Cloudinary for secure image storage and delivery
+- **🔒 One-time Download**: Secure one-time download links with automatic cleanup
+- **📱 Optimized**: Better performance with Cloudinary's CDN
+
 ### Image Generation Improvements
 - **Fixed**: Empty negative prompts are now properly handled
 - **Enhanced**: Better error messages for API failures
@@ -28,10 +34,28 @@ A robust, scalable backend system for an AI-powered image generation application
 - 📱 **Mobile-First** design with Google Play Billing integration
 - ⚡ **High Performance** with optimized database queries
 - 🔄 **RESTful API** design with proper status codes and error handling
-  - Multiple style presets (enhance, digital-art, etc.)
+  - **16+ Style Presets**: Choose from various artistic styles including:
+    - `realistic` - Photorealistic images (default)
+    - `anime` - Japanese anime/manga style
+    - `digital-art` - Digital artwork
+    - `comic` - Comic book style
+    - `fantasy-art` - Fantasy illustrations
+    - `line-art` - Clean line drawings
+    - `analog-film` - Vintage film look
+    - `neon-punk` - Cyberpunk/neon aesthetic
+    - `isometric` - Isometric 3D style
+    - `low-poly` - Low polygon 3D style
+    - `origami` - Paper craft style
+    - `modeling-compound` - Clay-like appearance
+    - `cinematic` - Movie still look
+    - `3d-model` - 3D rendered models
+    - `pixel-art` - Retro pixel graphics
+    - `tile-texture` - Seamless textures
+    - `none` - No style preset
   - Adjustable parameters (size, steps, CFG scale, etc.)
   - Negative prompts for better image control
-  - Image history and management
+  - Image history and management with Cloudinary integration
+  - Secure one-time download links
   - Rate limiting and request validation
 
 ## 🔧 Environment Variables
@@ -57,7 +81,7 @@ This application uses environment variables for configuration. Here's a breakdow
 | `DEFAULT_CFG_SCALE` | `7` | Default CFG scale for image generation |
 | `DEFAULT_STEPS` | `50` | Default number of generation steps |
 | `DEFAULT_SAMPLES` | `1` | Default number of images to generate |
-| `DEFAULT_STYLE_PRESET` | `enhance` | Default style preset |
+| `DEFAULT_STYLE_PRESET` | `realistic` | Default style preset (see available styles above) |
 | `RATE_LIMIT_WINDOW_MS` | `900000` (15 min) | Rate limiting window |
 | `RATE_LIMIT_MAX` | `100` | Max requests per window |
 
@@ -600,93 +624,6 @@ const imageUrl = await uploadToS3(
 
 ## 📚 API Reference & Examples
 
-### Image Generation
-
-#### Request
-```http
-POST /api/image/generate
-Authorization: Bearer <your_jwt_token>
-Content-Type: application/json
-
-{
-  "prompt": "a beautiful sunset over mountains, digital art",
-  "stylePreset": "digital-art",
-  "width": 1024,
-  "height": 1024,
-  "samples": 1,
-  "steps": 30,
-  "cfgScale": 7
-}
-```
-
-#### Response (Success)
-```json
-{
-  "success": true,
-  "data": {
-    "images": [
-      {
-        "id": "60a7b3c9e6b0f30015f8d9a1",
-        "imageData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA...",
-        "imageUrl": "/uploads/123e4567-e89b-12d3-a456-426614174000.png",
-        "prompt": "a beautiful sunset over mountains, digital art",
-        "createdAt": "2025-07-01T14:30:00.000Z"
-      }
-    ],
-    "coinsUsed": 10,
-    "remainingCoins": 990
-  }
-}
-```
-
-#### Frontend Usage Example
-```javascript
-// React component example
-function GeneratedImage({ imageData, prompt }) {
-  return (
-    <div className="generated-image">
-      <img 
-        src={imageData} 
-        alt={prompt}
-        style={{ maxWidth: '100%', height: 'auto' }}
-      />
-      <p>{prompt}</p>
-    </div>
-  );
-}
-
-// Plain HTML
-/*
-<div class="image-container">
-  <img 
-    src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA..." 
-    alt="AI generated image"
-  />
-</div>
-*/
-```
-
-### Important Notes
-- The `imageData` field contains the complete base64-encoded image data that can be directly used in an `<img>` tag
-- The `imageUrl` is also provided if you need to reference the image by URL
-- Base64 responses are larger than binary data, so consider this for mobile users
-- For large images, you might want to use the URL approach instead
-
-## 🧾 Subscription
-|--------|----------|-------------|---------------|
-| `POST` | `/api/image/generate` | Generate AI image | ✅ |
-| `GET` | `/api/image/history` | Get generation history | ✅ |
-| `GET` | `/api/image/:id` | Get specific image | ✅ |
-| `DELETE` | `/api/image/:id` | Delete generated image | ✅ |
-
-### 🧾 Subscription Service
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| `POST` | `/api/subscription/verify` | Verify Google Play subscription | ✅ |
-| `GET` | `/api/subscription/status` | Get subscription status | ✅ |
-
-## 📚 API Reference & Examples
-
 ### 🔐 Authentication
 
 #### Register a New User
@@ -695,6 +632,7 @@ POST /api/auth/register
 Content-Type: application/json
 
 {
+  "name": "John Doe",
   "email": "user@example.com",
   "password": "SecurePass123!"
 }
@@ -709,6 +647,219 @@ Content-Type: application/json
   "email": "user@example.com",
   "password": "SecurePass123!"
 }
+```
+
+### 👤 User Profile
+
+#### Get User Profile
+```http
+GET /api/user/profile
+Authorization: Bearer <your_jwt_token>
+```
+
+#### Update User Profile
+```http
+PUT /api/user/profile
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "name": "Updated Name",
+  "avatar": "https://example.com/avatar.jpg"
+}
+```
+
+### 💰 Coin Management
+
+#### Get Coin Balance
+```http
+GET /api/coin/balance
+Authorization: Bearer <your_jwt_token>
+```
+
+#### Purchase Coins
+```http
+POST /api/coin/buy
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "packageId": "coins_100",
+  "receipt": "<purchase_receipt>"
+}
+```
+
+### 🖼️ Image Generation
+
+#### Generate Image
+```http
+POST /api/image/generate
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "prompt": "A beautiful landscape with mountains and a lake at sunset",
+  "style": "anime",
+  "width": 768,
+  "height": 768,
+  "samples": 1,
+  "steps": 30,
+  "cfg_scale": 7,
+  "negative_prompt": "blurry, low quality, distorted",
+  "seed": 1234567890
+}
+```
+
+**Request Parameters:**
+- `prompt`: (Required) Text description of the image to generate
+- `style`: (Optional) Style preset (default: 'realistic')
+  - Options: 'realistic', 'anime', 'digital-art', 'comic', 'fantasy-art', etc.
+- `width`: (Optional) Image width in pixels (default: 512, max: 1024)
+- `height`: (Optional) Image height in pixels (default: 512, max: 1024)
+- `samples`: (Optional) Number of images to generate (default: 1, max: 4)
+- `steps`: (Optional) Number of diffusion steps (default: 30, range: 10-50)
+- `cfg_scale`: (Optional) How strictly to follow the prompt (default: 7, range: 1-35)
+- `negative_prompt`: (Optional) What to exclude from the generated image
+- `seed`: (Optional) Random seed for reproducible results
+
+**Response (Success 201):**
+```json
+{
+  "success": true,
+  "data": {
+    "images": [
+      {
+        "id": "60d5ec9b4f3a5a001f123456",
+        "imageId": "a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8",
+        "prompt": "A beautiful landscape with mountains and a lake at sunset",
+        "imageUrl": "https://res.cloudinary.com/your-cloud/image/upload/v1234567890/ai-generated-images/a1b2c3d4.jpg",
+        "downloadUrl": "https://yourapi.com/api/image/download/a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8",
+        "style": "anime",
+        "size": {
+          "width": 768,
+          "height": 768
+        },
+        "model": "stable-diffusion-v1-6",
+        "cfgScale": 7,
+        "steps": 30,
+        "seed": 1234567890,
+        "createdAt": "2025-07-05T00:00:00.000Z"
+      }
+    ],
+    "coinsUsed": 10,
+    "remainingCoins": 90
+  }
+}
+```
+
+#### Download Image (One-time)
+```http
+GET /api/image/download/:imageId
+```
+
+**Response:**
+- Returns the image file directly with appropriate content-type
+- The download URL is only valid once
+
+#### Get Image Details
+```http
+GET /api/image/:id
+Authorization: Bearer <your_jwt_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60d5ec9b4f3a5a001f123456",
+    "imageId": "a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8",
+    "prompt": "A beautiful landscape with mountains and a lake at sunset",
+    "imageUrl": "https://res.cloudinary.com/your-cloud/image/upload/v1234567890/ai-generated-images/a1b2c3d4.jpg",
+    "style": "anime",
+    "size": {
+      "width": 768,
+      "height": 768
+    },
+    "model": "stable-diffusion-v1-6",
+    "createdAt": "2025-07-05T00:00:00.000Z"
+  }
+}
+```
+
+#### Get Image Generation History
+```http
+GET /api/image/history
+Authorization: Bearer <your_jwt_token>
+Query Parameters:
+  - limit: Number of items per page (default: 10)
+  - page: Page number (default: 1)
+```
+
+#### Delete Image
+```http
+DELETE /api/image/:id
+Authorization: Bearer <your_jwt_token>
+```
+
+**Response (Success 200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "60d5ec9b4f3a5a001f123456",
+    "deleted": true
+  }
+}
+```
+
+### 🔄 Rate Limiting
+- **Limit**: 100 requests per 15 minutes
+- **Headers**:
+  - `X-RateLimit-Limit`: Total requests allowed
+  - `X-RateLimit-Remaining`: Remaining requests
+  - `X-RateLimit-Reset`: Time when limit resets (UTC timestamp)
+
+### ☁️ Cloudinary Integration
+All generated images are stored in Cloudinary with the following features:
+- Automatic format optimization
+- Global CDN delivery
+- One-time download URLs
+- Automatic cleanup of unused resources
+- Image transformations via URL parameters (e.g., `w_500,h_500,c_fill`)
+
+### 🎨 Style Guide
+| Style | Best For | Example Prompt |
+|-------|----------|----------------|
+| `realistic` | Photorealistic images, portraits | "A portrait of a woman with freckles, detailed skin texture, 85mm lens" |
+| `anime` | Japanese anime/manga style | "Anime girl with blue hair, school uniform, cherry blossoms in background" |
+| `digital-art` | Digital paintings, concept art | "Cyberpunk cityscape at night, neon lights, rain, digital painting" |
+| `pixel-art` | Retro video game graphics | "Pixel art of a medieval castle, 16-bit style, SNES graphics" |
+| `3d-model` | Product visualizations | "A modern smartphone on a marble table, product photography, studio lighting" |
+| `fantasy-art` | Fantasy illustrations | "A wizard casting a spell, glowing runes, dramatic lighting, fantasy art" |
+| `line-art` | Clean line drawings | "Minimalist line art of a cat, single continuous line, black and white" |
+| `neon-punk` | Cyberpunk aesthetic | "Neon-lit street at night, cyberpunk city, rain, glowing signs" |
+
+### 🚦 Error Responses
+All error responses follow this format:
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
+    "details": {}
+  }
+}
+```
+
+**Common Error Codes:**
+- `AUTH_REQUIRED`: Authentication token is missing or invalid
+- `INSUFFICIENT_COINS`: User doesn't have enough coins
+- `RATE_LIMIT_EXCEEDED`: Too many requests
+- `INVALID_PARAMETER`: Invalid request parameters
+- `IMAGE_NOT_FOUND`: Requested image doesn't exist or was deleted
+- `IMAGE_ALREADY_DOWNLOADED`: One-time download URL was already used
 ```
 
 ### 👤 User Profile

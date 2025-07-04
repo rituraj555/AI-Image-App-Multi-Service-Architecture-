@@ -3,8 +3,10 @@ const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const { uploadToCloudinary } = require('../config/cloudinary');
 const { ErrorResponse } = require('../utils/errorResponse');
 const { transformBufferObjects } = require('../utils/transformResponse');
+const { deleteFromCloudinary } = require('../config/cloudinary');
 const Image = require('../models/Image');
 const User = require('../models/User');
 const { RateLimiter } = require('limiter');
@@ -121,7 +123,7 @@ exports.generateImage = async (req, res, next) => {
   try {
     const { 
       prompt, 
-      stylePreset, 
+      style = 'realistic', // Default to realistic style
       negativePrompt, 
       width = 512, 
       height = 512, 
@@ -207,7 +209,9 @@ exports.generateImage = async (req, res, next) => {
     }
     
     // Add optional parameters if provided
-    if (stylePreset) payload.style_preset = stylePreset;
+    if (style && style !== 'none') {
+      payload.style_preset = style;
+    }
     if (clip_guidance_preset) payload.clip_guidance_preset = clip_guidance_preset;
     if (sampler) payload.sampler = sampler;
 
@@ -272,8 +276,8 @@ exports.generateImage = async (req, res, next) => {
     user.coins -= totalCost;
     await user.save({ session });
 
-    // Process the generated images
-    const imageArtifacts = [];
+    // Process each generated image
+    const generatedImages = [];
     
     // Ensure we have valid artifacts to process
     if (!Array.isArray(response.data.artifacts)) {
@@ -281,73 +285,75 @@ exports.generateImage = async (req, res, next) => {
     }
     
     for (const artifact of response.data.artifacts) {
-      const imageId = uuidv4();
-      let imageUrl = null;
-      
-      try {
-        // Save the image to storage permanently
-        if (artifact.base64) {
-          imageUrl = await saveImageToStorage(artifact.base64, imageId);
-          console.log(`Image saved to storage: ${imageUrl}`);
-        }
-      } catch (storageError) {
-        console.error('Failed to save image to storage:', storageError);
-        throw new Error('Failed to save the generated image to storage');
-      }
-      
-      // Create image record in database
-      const newImage = new Image({
-        userId,
-        prompt,
-        imageUrl,
-        imageId,
-        coinsUsed: COST_PER_IMAGE_SD16,
-        size: {
-          width: imgWidth,
-          height: imgHeight
-        },
-        model: 'stable-diffusion-v1-6',
-        stylePreset: stylePreset || null,
-        negativePrompt: negativePrompt || null,
-        cfgScale: parseFloat(cfg_scale) || 7,
-        steps: parseInt(steps) || 30,
-        seed: seed || null,
-        samples: parseInt(samples) || 1
-      });
+      if (artifact.finishReason === 'SUCCESS') {
+        const imageId = uuidv4();
+        
+        try {
+          // Upload to Cloudinary
+          const { url: imageUrl, public_id: cloudinaryPublicId } = await uploadToCloudinary(
+            artifact.base64,
+            'ai-generated-images'
+          );
+          
+          // Create image record in database
+          const newImage = new Image({
+            userId: req.user.id,
+            prompt: req.body.prompt,
+            imageUrl,
+            imageId,
+            cloudinaryPublicId,
+            coinsUsed: COST_PER_IMAGE_SD16,
+            size: {
+              width: parseInt(req.body.width) || 512,
+              height: parseInt(req.body.height) || 512
+            },
+            model: 'stable-diffusion-v1-6',
+            style: style,
+            negativePrompt: req.body.negativePrompt || null,
+            cfgScale: parseFloat(req.body.cfg_scale) || 7,
+            steps: parseInt(req.body.steps) || 30,
+            seed: req.body.seed || Math.floor(Math.random() * 4294967295),
+            samples: parseInt(req.body.samples) || 1
+          });
 
-      await newImage.save({ session });
-      
-      // Prepare response data (without base64)
-      const imageData = {
-        id: newImage._id,
-        imageId: newImage.imageId,
-        prompt: newImage.prompt,
-        imageUrl: `/api/image/download/${newImage.imageId}`, // Use download endpoint
-        size: newImage.size,
-        model: newImage.model,
-        stylePreset: newImage.stylePreset,
-        negativePrompt: newImage.negativePrompt,
-        cfgScale: newImage.cfgScale,
-        steps: newImage.steps,
-        seed: newImage.seed,
-        samples: newImage.samples,
-        coinsUsed: COST_PER_IMAGE_SD16,
-        createdAt: newImage.createdAt,
-        downloaded: newImage.downloaded
-      };
-      
-      imageArtifacts.push(imageData);
+          await newImage.save({ session });
+          
+          // Prepare response data
+          generatedImages.push({
+            id: newImage._id,
+            imageId: newImage.imageId,
+            prompt: newImage.prompt,
+            imageUrl: newImage.imageUrl,
+            cloudinaryPublicId: newImage.cloudinaryPublicId,
+            downloadUrl: `${req.protocol}://${req.get('host')}/api/image/download/${newImage.imageId}`,
+            size: newImage.size,
+            model: newImage.model,
+            stylePreset: newImage.stylePreset,
+            negativePrompt: newImage.negativePrompt,
+            cfgScale: newImage.cfgScale,
+            steps: newImage.steps,
+            seed: newImage.seed,
+            samples: newImage.samples,
+            coinsUsed: COST_PER_IMAGE_SD16,
+            createdAt: newImage.createdAt,
+            downloaded: newImage.downloaded
+          });
+        } catch (uploadError) {
+          console.error('Error uploading to Cloudinary:', uploadError);
+          throw new Error('Failed to upload image to Cloudinary');
+        }
+      }
     }
 
     // Commit the transaction
     await session.commitTransaction();
     session.endSession();
 
-    // Prepare the response with base64 data
+    // Prepare the response with image data
     const responseData = {
       success: true,
       data: {
-        images: imageArtifacts,
+        images: generatedImages,
         coinsUsed: totalCost,
         remainingCoins: user.coins - totalCost
       }
@@ -492,41 +498,54 @@ exports.downloadImage = async (req, res, next) => {
     image.downloaded = true;
     await image.save({ session });
     
-    // Get the file path
-    const filePath = path.join(__dirname, `../public/uploads/${image.imageId}.png`);
+    // Define the uploads directory path (same as in saveImageToStorage)
+    const uploadDir = path.join(__dirname, '../../public/uploads');
+    const filePath = path.join(uploadDir, `${image.imageId}.png`);
     
-    // Set headers for file download
-    res.setHeader('Content-Disposition', `attachment; filename="${image.imageId}.png"`);
-    res.setHeader('Content-Type', 'image/png');
-    
-    // Stream the file
-    const fileStream = fs.createReadStream(filePath);
-    
-    // When the stream ends, delete the file
-    fileStream.on('end', async () => {
-      try {
-        // Delete the file after streaming
-        await fs.promises.unlink(filePath);
-        await session.commitTransaction();
-        session.endSession();
-      } catch (error) {
-        console.error('Error deleting image after download:', error);
+    try {
+      // Verify the file exists before trying to stream it
+      await fs.promises.access(filePath, fs.constants.F_OK);
+      
+      // Set headers for file download
+      res.setHeader('Content-Disposition', `attachment; filename="${image.imageId}.png"`);
+      res.setHeader('Content-Type', 'image/png');
+      
+      // Stream the file
+      const fileStream = fs.createReadStream(filePath);
+      
+      // When the stream ends, delete the file
+      fileStream.on('end', async () => {
+        try {
+          // Delete the file after streaming
+          await fs.promises.unlink(filePath);
+          await session.commitTransaction();
+          session.endSession();
+        } catch (deleteError) {
+          console.error('Error deleting image after download:', deleteError);
+          await session.abortTransaction();
+          session.endSession();
+        }
+      });
+      
+      // Handle stream errors
+      fileStream.on('error', async (error) => {
+        console.error('Error streaming image:', error);
         await session.abortTransaction();
         session.endSession();
+        next(new ErrorResponse('Error streaming image', 500));
+      });
+      
+      // Pipe the file to the response
+      return fileStream.pipe(res);
+      
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        await session.abortTransaction();
+        session.endSession();
+        return next(new ErrorResponse('Image file not found', 404));
       }
-    });
-    
-    // Handle stream errors
-    fileStream.on('error', async (error) => {
-      console.error('Error streaming image:', error);
-      await session.abortTransaction();
-      session.endSession();
-      next(new ErrorResponse('Error streaming image', 500));
-    });
-    
-    // Pipe the file to the response
-    fileStream.pipe(res);
-    
+      throw error; // Re-throw other errors
+    }
   } catch (error) {
     await session.abortTransaction().catch(console.error);
     session.endSession().catch(console.error);
@@ -608,7 +627,7 @@ exports.deleteImage = async (req, res, next) => {
   session.startTransaction();
   
   try {
-    // Find the image first to get the imageId
+    // Find the image first to get the imageId and Cloudinary public ID
     const image = await Image.findOne({
       _id: req.params.id,
       userId: req.user.id
@@ -619,32 +638,33 @@ exports.deleteImage = async (req, res, next) => {
       session.endSession();
       return next(new ErrorResponse('Image not found', 404));
     }
-    
-    const imageId = image.imageId;
-    
-    // Delete the image record from the database
+
+    // Delete the image from Cloudinary if it exists
+    if (image.cloudinaryPublicId) {
+      try {
+        await deleteFromCloudinary(image.cloudinaryPublicId);
+      } catch (cloudinaryError) {
+        console.error('Error deleting image from Cloudinary:', cloudinaryError);
+        // Continue with database deletion even if Cloudinary deletion fails
+      }
+    }
+
+    // Delete the image record from database
     await Image.deleteOne({ _id: req.params.id }).session(session);
     
-    // Delete the image file from storage
-    try {
-      await deleteImageFromStorage(imageId);
-    } catch (storageError) {
-      console.error('Failed to delete image file:', storageError);
-      // Continue with the deletion even if file deletion fails
-    }
-    
+    // Commit the transaction
     await session.commitTransaction();
     session.endSession();
 
     res.status(200).json({
       success: true,
-      data: { id: req.params.id, deleted: true }
+      data: {}
     });
   } catch (error) {
-    await session.abortTransaction().catch(console.error);
-    session.endSession().catch(console.error);
+    await session.abortTransaction();
+    session.endSession();
     
-    console.error(`Error deleting image ${req.params.id}:`, error);
+    console.error('Error deleting image:', error);
     
     if (error.name === 'CastError') {
       return next(new ErrorResponse('Invalid image ID', 400));
@@ -674,6 +694,7 @@ async function saveImageToStorage(base64Data, imageId) {
   const uploadDir = path.join(__dirname, '../../public/uploads');
   
   try {
+    console.log(`[DEBUG] Creating directory: ${uploadDir}`);
     // Create the directory if it doesn't exist (recursively)
     await fs.promises.mkdir(uploadDir, { recursive: true });
     
@@ -681,9 +702,20 @@ async function saveImageToStorage(base64Data, imageId) {
     const fileName = `${imageId}.png`;
     const filePath = path.join(uploadDir, fileName);
     
+    console.log(`[DEBUG] Saving image to: ${filePath}`);
+    
     // Convert base64 to buffer and write to file
     const buffer = Buffer.from(base64Data, 'base64');
     await fs.promises.writeFile(filePath, buffer);
+    
+    // Verify the file was saved
+    try {
+      const stats = await fs.promises.stat(filePath);
+      console.log(`[DEBUG] File saved successfully. Size: ${stats.size} bytes`);
+    } catch (verifyError) {
+      console.error('[ERROR] Failed to verify file was saved:', verifyError);
+      throw new Error('Failed to verify image was saved to storage');
+    }
     
     // Return the relative URL path
     return `/uploads/${fileName}`;
