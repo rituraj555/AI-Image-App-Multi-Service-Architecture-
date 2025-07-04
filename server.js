@@ -119,3 +119,6 @@ process.on('unhandledRejection', (err) => {
 });
 
 startServer();
+
+module.exports = app;
+
