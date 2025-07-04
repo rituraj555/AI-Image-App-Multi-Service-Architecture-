@@ -10,13 +10,15 @@ const {
 
 const router = express.Router();
 
-// All routes are protected by JWT authentication
+// Public download endpoint (no authentication required)
+router.get('/download/:imageId', downloadImage);
+
+// All other routes are protected by JWT authentication
 router.use(protect);
 
-// Image generation and management routes
+// Protected image management routes
 router.post('/generate', generateImage);
 router.get('/history', getImageHistory);
-router.get('/download/:imageId', downloadImage); // One-time download endpoint
 router.get('/:id', getImage);
 router.delete('/:id', deleteImage);
 

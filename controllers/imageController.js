@@ -470,9 +470,9 @@ exports.downloadImage = async (req, res, next) => {
   session.startTransaction();
   
   try {
+    // No user check, but we still verify the image exists and hasn't been downloaded
     const image = await Image.findOne({
-      imageId: req.params.imageId,
-      userId: req.user.id
+      imageId: req.params.imageId
     }).session(session);
 
     if (!image) {

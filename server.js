@@ -123,8 +123,4 @@ if (process.env.VERCEL !== '1') {
   startServer();
 }
 
-
 module.exports = app;
-
-
-
