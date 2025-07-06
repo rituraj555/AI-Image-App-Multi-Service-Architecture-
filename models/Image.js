@@ -43,17 +43,20 @@ const imageSchema = new mongoose.Schema({
     type: String,
     default: 'stable-diffusion-xl-1024-v1-0'
   },
-  style: {
-    type: String,
-    enum: [
-      'realistic', 'anime', 'digital-art', 'comic', 'fantasy-art',
-      'line-art', 'analog-film', 'neon-punk', 'isometric', 'low-poly',
-      'origami', 'modeling-compound', 'cinematic', '3d-model', 'pixel-art',
-      'tile-texture', 'none'
-    ],
-    default: 'realistic',
-    required: true
-  },
+
+
+
+style: {
+  type: String,
+  enum: [
+    'realistic', 'anime', 'digital-art', 'comic', 'fantasy-art',
+    'line-art', 'analog-film', 'neon-punk', 'isometric', 'low-poly',
+    'origami', 'modeling-compound', 'cinematic', '3d-model', 'pixel-art',
+    'tile-texture', 'photographic', 'enhance', 'comic-book', 'none'
+  ],
+  default: 'realistic',
+  required: true
+},
   downloaded: {
     type: Boolean,
     default: false,
